@@ -1051,31 +1051,45 @@ function generateMainImage() {
   selectedAngles = []; generatedPoseUrls = [];
   document.getElementById('batch-progress').classList.remove('show');
   document.getElementById('poses-result').style.display = 'none';
+  generateWithServer(currentPrompt, dl.q, dl.rw, dl.rh, url => showGenResult(url));
+}
 
-  if (tier === 'pro' && gcpProject) {
-    generateWithVertex();
-  } else {
-    generateWithPollinations(currentPrompt, dl.q, dl.rw, dl.rh, url => showGenResult(url));
+async function generateWithServer(prompt, size, rw, rh, callback) {
+  const w = Math.round(size), h = Math.round(size * (rh / rw));
+  const seed = Math.floor(Math.random() * 999999);
+  document.getElementById('gen-loader-title').textContent = 'Image generate ho rahi hai...';
+  document.getElementById('gen-loader-sub').textContent = 'AI se nayi image ban rahi hai — 20-40 seconds';
+  document.getElementById('s3-engine-label').textContent = 'Generating...';
+  setProgress('gen-progress', 15);
+  let p = 15;
+  const iv = setInterval(() => { p = Math.min(p + 4, 80); setProgress('gen-progress', p); }, 2000);
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, width: w, height: h, seed })
+    });
+    const data = await res.json();
+    clearInterval(iv);
+    setProgress('gen-progress', 100);
+    if (data.imageBase64) {
+      callback(data.imageBase64);
+    } else if (data.imageUrl) {
+      callback(data.imageUrl);
+    } else {
+      throw new Error('No image returned');
+    }
+  } catch (err) {
+    clearInterval(iv);
+    // Direct fallback
+    const enc = encodeURIComponent(prompt + ', professional photography, highly detailed, sharp focus');
+    const url = `https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
+    callback(url);
   }
 }
 
 function generateWithPollinations(prompt, size, rw, rh, callback) {
-  const w = Math.round(size), h = Math.round(size * (rh / rw));
-  const seed = Math.floor(Math.random() * 999999);
-  const enc = encodeURIComponent(prompt + ', professional photography, highly detailed, sharp focus, commercial grade');
-  const url = `https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
-  document.getElementById('gen-loader-title').textContent = 'Pollinations AI se generate ho raha hai...';
-  document.getElementById('gen-loader-sub').textContent = 'Free tier — 15-30 seconds';
-  document.getElementById('s3-engine-label').textContent = 'Pollinations AI';
-  setProgress('gen-progress', 20);
-  const img = new Image(); img.crossOrigin = 'anonymous';
-  let done = false;
-  img.onload = () => { if (!done) { done = true; setProgress('gen-progress', 100); callback(url); } };
-  img.onerror = () => { if (!done) { done = true; callback(url); } };
-  img.src = url;
-  setTimeout(() => { if (!done) { done = true; callback(url); } }, 16000);
-  let p = 20;
-  const iv = setInterval(() => { p = Math.min(p + 5, 85); setProgress('gen-progress', p); if (p >= 85 || done) clearInterval(iv); }, 1500);
+  generateWithServer(prompt, size, rw, rh, callback);
 }
 
 async function generateWithVertex() {
