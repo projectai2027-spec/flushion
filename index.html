@@ -723,9 +723,17 @@ function showGenResult(src){
     showToast('Image ready!');
   };
   imgEl.onerror=()=>{
-    spinner.style.display='none';
-    imgEl.style.display='block';
-    showToast('Image loaded');
+    // Try direct URL if something failed
+    const enc=encodeURIComponent(currentPrompt.slice(0,400)+', professional photography');
+    const fallback=`https://image.pollinations.ai/prompt/${enc}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random()*99999)}`;
+    if(imgEl.src!==fallback){
+      imgEl.src=fallback;
+      currentGenUrl=fallback;
+    }else{
+      spinner.style.display='none';
+      imgEl.style.display='block';
+      showToast('Image loaded');
+    }
   };
   imgEl.src=src;
 }
@@ -906,7 +914,7 @@ async function generateAngles(){
 
     await new Promise(resolve=>{
       const img=new Image();
-      const timeout=setTimeout(()=>resolve(),15000);
+      const timeout=setTimeout(()=>resolve(),90000);
       img.onload=()=>{clearTimeout(timeout);resolve();};
       img.onerror=()=>{clearTimeout(timeout);resolve();};
       img.src=url;
