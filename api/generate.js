@@ -2,48 +2,43 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { prompt, width, height, seed } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Prompt required' });
+    const { prompt, width = 1024, height = 1024 } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
 
-    const w = width || 512;
-    const h = height || 512;
-    const s = seed || Math.floor(Math.random() * 999999);
+    const cleanPrompt = encodeURIComponent(prompt.trim().substring(0, 500));
+    const seed = Math.floor(Math.random() * 999999);
+    const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
 
-    const encoded = encodeURIComponent(prompt + ', professional photography, highly detailed, sharp focus, commercial grade');
-    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${w}&height=${h}&nologo=true&seed=${s}`;
+    console.log('Fetching from Pollinations:', imageUrl);
 
-    // Fetch from Pollinations on server side
-    const imgRes = await fetch(imageUrl, {
-      headers: { 'User-Agent': 'Flushion-Studio/1.0' }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
+
+    const imageRes = await fetch(imageUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'FlushionStudio/1.0' }
     });
+    clearTimeout(timeout);
 
-    if (!imgRes.ok) {
-      // Return the URL anyway — let client try
-      return res.status(200).json({ success: true, imageUrl });
-    }
+    if (!imageRes.ok) throw new Error(`Pollinations error: ${imageRes.status}`);
 
-    const buffer = await imgRes.arrayBuffer();
+    const buffer = await imageRes.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
-    const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
+    const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
 
     return res.status(200).json({
       success: true,
-      imageUrl,
-      imageBase64: `data:${mimeType};base64,${base64}`
+      image: `data:${contentType};base64,${base64}`,
+      url: imageUrl
     });
 
   } catch (err) {
-    // Even on error, return the direct URL so client can try
-    const { prompt, width, height, seed } = req.body;
-    const w = width || 512;
-    const h = height || 512;
-    const s = seed || Math.floor(Math.random() * 999999);
-    const encoded = encodeURIComponent((prompt || '') + ', professional photography');
-    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=${w}&height=${h}&nologo=true&seed=${s}`;
-    return res.status(200).json({ success: true, imageUrl, error: err.message });
+    console.error('Generate error:', err.message);
+    return res.status(500).json({ error: err.message || 'Generation failed' });
   }
 }
