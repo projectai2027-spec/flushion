@@ -709,39 +709,31 @@ function showGenResult(src){
   document.getElementById('gen-prompt-preview').textContent=currentPrompt.slice(0,200)+(currentPrompt.length>200?'...':'');
   updateSummary();
 
-  // Show image with loading state
-  const wrap=document.getElementById('gen-img-wrap');
   const spinner=document.getElementById('img-loading-spinner');
   const imgEl=document.getElementById('gen-img');
 
   spinner.style.display='block';
   imgEl.style.display='none';
 
-  imgEl.onload=()=>{
-    spinner.style.display='none';
-    imgEl.style.display='block';
-    showToast('Image ready!');
-  };
-  imgEl.onerror=()=>{
-    // If base64 failed (shouldn't), or URL failed — show fallback
-    if(src && src.startsWith('data:')){
-      // base64 loaded but onerror — just show it anyway
-      spinner.style.display='none';
-      imgEl.style.display='block';
-    } else {
-      const enc=encodeURIComponent(currentPrompt.slice(0,400)+', professional photography');
-      const fallback=`https://image.pollinations.ai/prompt/${enc}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random()*99999)}`;
-      if(imgEl.src!==fallback){
-        imgEl.src=fallback;
-        currentGenUrl=fallback;
-      }else{
-        spinner.style.display='none';
-        imgEl.style.display='block';
-        showToast('Image loaded');
-      }
-    }
-  };
-  imgEl.src=src;
+  // Poll Pollinations URL — it returns 200 only when image is ready
+  let attempts=0;
+  const maxAttempts=40;
+  function tryLoad(){
+    attempts++;
+    const testImg=new Image();
+    testImg.onload=()=>{
+      imgEl.src=src+'&t='+Date.now();
+      imgEl.onload=()=>{ spinner.style.display='none'; imgEl.style.display='block'; showToast('Image ready!'); };
+      imgEl.onerror=()=>{ spinner.style.display='none'; imgEl.style.display='block'; };
+      imgEl.src=src;
+    };
+    testImg.onerror=()=>{
+      if(attempts<maxAttempts){ setTimeout(tryLoad,3000); }
+      else { spinner.style.display='none'; imgEl.src=src; imgEl.style.display='block'; showToast('Image loaded'); }
+    };
+    testImg.src=src+'?attempt='+attempts+'&t='+Date.now();
+  }
+  setTimeout(tryLoad,4000);
 }
 
 // ═══ DOWNLOAD CRITERIA ═══
@@ -764,13 +756,60 @@ function updateSummary(){
 async function downloadFinal(){
   const btn=document.getElementById('dl-btn');
   btn.disabled=true;btn.textContent='Preparing...';
-  showProc('Preparing download...','Applying format and resolution settings');
+  showProc('Preparing download...','Generating at selected resolution');
   try{
     const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
-    setProc(20,'Loading image at selected resolution...');
+    const seed=Math.floor(Math.random()*999999);
+    setProc(20,'Building download URL...');
 
-    // Use the stored image (base64 or URL) — no re-generation needed
-    const imgEl=await loadImgCORS(currentGenUrl);
+    // Build fresh URL at correct size
+    const enc=encodeURIComponent(currentPrompt.slice(0,500)+', professional photography, highly detailed, sharp focus, commercial grade');
+    const freshUrl=`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}&enhance=true&model=flux`;
+
+    setProc(50,'Loading image...');
+    const imgEl=await loadImgCORS(freshUrl);
+    setProc(70,'Processing canvas...');
+
+    const canvas=document.createElement('canvas');
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d');
+
+    if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);}
+    ctx.drawImage(imgEl,0,0,w,h);
+    if(dl.fmt==='transparent'){setProc(80,'Removing background...');removeBg(ctx,w,h);}
+
+    setProc(95,'Creating file...');
+    await sleep(200);
+
+    const ext=dl.fmt==='jpg'?'jpg':'png';
+    const mime=dl.fmt==='jpg'?'image/jpeg':'image/png';
+    const quality=dl.fmt==='jpg'?0.95:undefined;
+
+    canvas.toBlob(blob=>{
+      if(!blob){
+        hideProc();
+        directDownload(freshUrl,ext);
+        return;
+      }
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`flushion-${dl.rl.replace(':','x')}-${w}x${h}-${Date.now()}.${ext}`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      hideProc();
+      showToast('Image downloaded!');
+      btn.disabled=false;
+      btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
+      document.getElementById('step4').classList.add('done');
+    },mime,quality);
+
+  }catch(err){
+    hideProc();
+    showToast('Downloading directly...');
+    directDownload(currentGenUrl,'jpg');
+    btn.disabled=false;
+    btn.textContent='Download Image';
+  }
+}
     setProc(70,'Processing canvas...');
 
     const canvas=document.createElement('canvas');
