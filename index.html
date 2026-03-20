@@ -227,9 +227,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <button class="tier-btn active" id="tier-free-btn" onclick="setTier('free')">Free</button>
         <button class="tier-btn" id="tier-pro-btn" onclick="setTier('pro')">Pro (Vertex AI)</button>
       </div>
-      <div class="api-badge" onclick="toggleApiPanel()">
-        <div class="dot" id="api-dot"></div>
-        <span id="api-badge-txt">APIs</span>
+      <div class="api-badge">
+        <div class="dot on"></div>
+        <span>Gemini AI Ready</span>
       </div>
     </div>
   </div>
@@ -242,23 +242,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <div class="stp"><div class="stp-n">5</div> Download</div>
     </div>
 
-    <div id="api-panel" class="api-panel">
-      <div style="font-size:13px;font-weight:500;margin-bottom:4px;">API Keys</div>
-      <div class="api-grid">
-        <div class="api-field">
-          <label>Anthropic (Claude) API Key</label>
-          <input type="password" id="claude-key" placeholder="sk-ant-api03-..." oninput="checkKeys()"/>
-        </div>
-        <div class="api-field">
-          <label>Vertex AI — GCP Project ID</label>
-          <input type="text" id="gcp-project" placeholder="my-gcp-project-id" oninput="checkKeys()"/>
-        </div>
-      </div>
-      <div style="margin-top:8px;display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="saveKeys()">Save Keys</button>
-        <span style="font-size:11px;color:var(--muted);align-self:center;">Claude key: <a href="https://console.anthropic.com" target="_blank" style="color:var(--purple);">console.anthropic.com</a></span>
-      </div>
-    </div>
+
 
     <div class="sec-title">Product image upload karein</div>
     <div class="sec-sub">Koi bhi product — saree, garment, jewelry, electronics, food, furniture. AI automatically detect karega aur professional prompts generate karega.</div>
@@ -913,52 +897,43 @@ async function startDetect() {
   document.getElementById('detect-loader').style.display = 'block';
   document.getElementById('detect-result').style.display = 'none';
   document.getElementById('detect-img').src = URL.createObjectURL(uploadedFiles[0]);
-
   setProgress('detect-progress', 20);
-  updateDetectLoader('Product type detect ho raha hai...', claudeKey ? 'Claude API se analysis...' : 'Smart detection running...');
-
-  if (claudeKey) {
-    await detectWithClaude();
-  } else {
-    await detectWithKeywords();
-  }
+  updateDetectLoader('Product type detect ho raha hai...', 'Gemini AI image analyze kar raha hai...');
+  await detectWithGemini();
 }
 
-async function detectWithClaude() {
+async function detectWithGemini() {
   try {
     const b64 = await toBase64(uploadedFiles[0]);
     const ud = document.getElementById('user-desc').value.trim();
     setProgress('detect-progress', 40);
-    updateDetectLoader('Claude image analyze kar raha hai...', 'Product type, sub-type aur fidelity rules identify ho rahe hain...');
+    updateDetectLoader('Gemini AI analyze kar raha hai...', 'Product type, sub-type aur fidelity rules identify ho rahe hain...');
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-opus-4-5', max_tokens: 1200,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: uploadedFiles[0].type, data: b64 } },
-          { type: 'text', text: `You are an expert product photography AI. Analyze this image and respond in EXACTLY this JSON format (no markdown, no explanation, just JSON):
-{
-  "category": "one of: saree, western_fashion, jewelry, electronics, food, furniture, footwear, bag, beauty",
-  "sub_type": "specific sub-type within category",
-  "title": "short Hindi/English title describing the product",
-  "description": "2-3 sentences in Hindi about what this product is and its commercial potential",
-  "fidelity_rules": ["rule1", "rule2", "rule3", "rule4"],
-  "generation_prompt_base": "Detailed English prompt describing the product for AI image generation — include material, color, pattern, texture, style"
-}
-${ud ? 'Additional info from user: ' + ud : ''}` }
-        ]}] })
+        imageBase64: b64,
+        mimeType: uploadedFiles[0].type,
+        userDesc: ud
+      })
     });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    setProgress('detect-progress', 80);
-    const text = data.content[0].text.trim();
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-    showDetectResult(parsed.category, parsed.sub_type, parsed.title, parsed.description, parsed.fidelity_rules, parsed.generation_prompt_base);
+
+    const result = await res.json();
+    if (!result.success) throw new Error(result.error || 'API error');
+
+    setProgress('detect-progress', 85);
+    const d = result.data;
+    showDetectResult(
+      d.category,
+      d.sub_type,
+      d.title,
+      d.description,
+      d.fidelity_rules,
+      d.generation_prompt
+    );
   } catch (err) {
-    showToast('Claude error — demo mode: ' + err.message.slice(0, 40));
+    showToast('Gemini error — demo mode mein chal raha hai');
     await detectWithKeywords();
   }
 }
