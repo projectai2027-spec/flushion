@@ -1,44 +1,1002 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flushion Studio — Universal AI Photography</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0f0e0d;--cream:#f7f4ef;--gold:#c9a84c;--gold-l:#f5ecd0;
+  --purple:#5c3d8f;--purple-l:#ede8f8;--blue:#1a4a8a;--blue-l:#e6eef8;
+  --green:#1a6a3a;--green-l:#e6f5ec;--surface:#fff;
+  --muted:#7a7468;--border:rgba(15,14,13,0.1);--radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;}
+.screen{display:none;min-height:100vh;flex-direction:column;}
+.screen.active{display:flex;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.brand{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-1px;}
+.brand span{color:var(--purple);}
+.brand small{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px;letter-spacing:0;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.api-badge{display:flex;align-items:center;gap:6px;font-size:11px;background:var(--cream);border:1px solid var(--border);border-radius:99px;padding:5px 12px;color:var(--muted);}
+.dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;}
+.dot.on{background:#1a6a3a;}
+.tier-toggle{display:flex;border:1px solid var(--border);border-radius:99px;overflow:hidden;background:var(--cream);}
+.tier-btn{padding:5px 12px;font-size:11px;font-weight:500;border:none;background:transparent;cursor:pointer;color:var(--muted);transition:all .15s;}
+.tier-btn.active{background:var(--ink);color:#fff;}
+.body{flex:1;padding:32px 28px;max-width:900px;margin:0 auto;width:100%;}
+.steps-bar{display:flex;align-items:center;margin-bottom:32px;background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:5px 8px;overflow-x:auto;gap:0;}
+.stp{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:11px;color:var(--muted);white-space:nowrap;transition:all .2s;}
+.stp.active{background:var(--ink);color:#fff;}
+.stp.done{color:var(--green);}
+.stp-n{width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;}
+.stp.active .stp-n{background:rgba(255,255,255,0.2);color:#fff;}
+.stp.done .stp-n{background:var(--green-l);color:var(--green);}
+.sep{color:var(--border);padding:0 2px;font-size:14px;}
+.sec-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px;}
+.sec-sub{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6;}
+.upload-zone{border:2px dashed rgba(92,61,143,0.3);border-radius:18px;background:rgba(92,61,143,0.03);padding:44px 28px;text-align:center;cursor:pointer;transition:all .2s;position:relative;margin-bottom:18px;}
+.upload-zone:hover{border-color:var(--purple);background:rgba(92,61,143,0.07);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{width:48px;height:48px;border-radius:50%;background:var(--purple-l);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;}
+.upload-icon svg{width:20px;height:20px;stroke:var(--purple);fill:none;stroke-width:1.8;stroke-linecap:round;}
+.upload-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:600;margin-bottom:5px;}
+.upload-hint{font-size:12px;color:var(--muted);}
+.preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:12px;}
+.preview-thumb{aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+.preview-thumb img{width:100%;height:100%;object-fit:cover;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:10px;font-family:'Syne',sans-serif;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s;}
+.btn:active{transform:scale(0.98);}
+.btn-primary{background:var(--ink);color:#fff;}
+.btn-primary:hover{background:#2a2825;}
+.btn-primary:disabled{background:#ccc;cursor:not-allowed;transform:none;}
+.btn-purple{background:var(--purple);color:#fff;}
+.btn-purple:hover{background:#4a2d7a;}
+.btn-purple:disabled{background:#bbb;cursor:not-allowed;}
+.btn-outline{background:transparent;color:var(--ink);border:1px solid var(--border);}
+.btn-outline:hover{background:rgba(0,0,0,0.04);}
+.btn-gold{background:var(--gold);color:#fff;}
+.btn-gold:hover{background:#b8943f;}
+.btn-gold:disabled{background:#e8d49a;cursor:not-allowed;}
+.btn-sm{padding:8px 16px;font-size:12px;}
+.back-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;margin-bottom:20px;font-family:'DM Sans',sans-serif;}
+.back-btn:hover{color:var(--ink);}
+.action-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+.loading-wrap{text-align:center;padding:56px 20px;}
+.spinner{width:44px;height:44px;border:3px solid var(--gold-l);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:600;margin-bottom:6px;}
+.loading-sub{font-size:12px;color:var(--muted);}
+.progress-wrap{width:260px;height:4px;background:var(--gold-l);border-radius:99px;margin:12px auto 0;overflow:hidden;}
+.progress-bar{height:100%;background:var(--gold);border-radius:99px;width:0%;transition:width .5s ease;}
+.detect-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:18px;}
+.detect-img{width:100%;max-height:260px;object-fit:cover;display:block;}
+.detect-body{padding:18px 20px;}
+.detect-badge{display:inline-block;background:var(--purple-l);color:var(--purple);font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.detect-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:8px;}
+.detect-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px;}
+.fidelity-list{background:var(--purple-l);border-radius:8px;padding:12px 14px;margin-bottom:16px;}
+.fidelity-title{font-size:11px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.fidelity-item{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--ink);padding:3px 0;}
+.fi-dot{width:5px;height:5px;border-radius:50%;background:var(--purple);flex-shrink:0;margin-top:5px;}
+.shots-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:12px;}
+.shot-card{border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface);transition:all .15s;}
+.shot-card:hover{border-color:var(--purple);}
+.shot-card.sel{border-color:var(--purple);background:var(--purple-l);}
+.shot-id{font-size:10px;font-weight:600;color:var(--purple);margin-bottom:3px;}
+.shot-name{font-size:12px;font-weight:500;color:var(--ink);margin-bottom:2px;}
+.shot-card.sel .shot-name{color:var(--purple);}
+.shot-lens{font-size:10px;color:var(--muted);}
+.prompt-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.prompt-textarea{width:100%;padding:12px 14px;border:1px solid rgba(92,61,143,0.4);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;background:#faf8ff;color:var(--ink);resize:vertical;min-height:90px;outline:none;line-height:1.6;}
+.prompt-textarea:focus{border-color:var(--purple);}
+.options-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+.opt-group label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;}
+.opt-group select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink);outline:none;}
+.desc-area{width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:10px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--surface);color:var(--ink);resize:vertical;min-height:70px;outline:none;transition:border-color .2s;margin-bottom:4px;line-height:1.6;}
+.desc-area:focus{border-color:var(--purple);}
+.optional-tag{font-size:11px;color:var(--muted);margin-bottom:18px;}
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+/* GENERATED IMAGE */
+.gen-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;animation:fadeUp .4s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.gen-img-wrap{background:#f0ece4;position:relative;min-height:300px;display:flex;align-items:center;justify-content:center;}
+.gen-img{width:100%;max-height:500px;object-fit:contain;display:block;}
+.gen-badge{position:absolute;top:10px;left:10px;background:rgba(255,255,255,0.92);border:1px solid var(--border);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:500;}
+.gen-body{padding:18px 20px;}
+.gen-prompt-preview{font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:16px;font-family:monospace;background:var(--cream);padding:8px 10px;border-radius:6px;max-height:60px;overflow:hidden;}
 
-  try {
-    const { prompt, width = 1024, height = 1024 } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+/* DOWNLOAD CRITERIA */
+.dl-box{background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+.dl-sec-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.chip{padding:5px 13px;border:1.5px solid var(--border);border-radius:99px;font-size:11px;font-weight:500;cursor:pointer;background:var(--surface);color:var(--ink);transition:all .15s;user-select:none;}
+.chip:hover{border-color:var(--purple);}
+.chip.sel{border-color:var(--purple);background:var(--purple-l);color:var(--purple);}
+.fmt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.fmt-card{border:1.5px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;background:var(--surface);transition:all .15s;}
+.fmt-card:hover{border-color:var(--purple);}
+.fmt-card.sel{border-color:var(--purple);background:var(--purple-l);}
+.fmt-icon{font-size:18px;margin-bottom:4px;}
+.fmt-name{font-size:11px;font-weight:600;color:var(--ink);}
+.fmt-card.sel .fmt-name{color:var(--purple);}
+.fmt-desc{font-size:10px;color:var(--muted);}
+.ratio-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.ratio-chip{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface);transition:all .15s;}
+.ratio-chip:hover{border-color:var(--purple);}
+.ratio-chip.sel{border-color:var(--purple);background:var(--purple-l);}
+.ratio-box{background:rgba(0,0,0,0.12);border-radius:2px;}
+.ratio-chip.sel .ratio-box{background:var(--purple);}
+.ratio-label{font-size:11px;font-weight:600;color:var(--ink);}
+.ratio-chip.sel .ratio-label{color:var(--purple);}
+.ratio-name{font-size:9px;color:var(--muted);}
+.dl-summary{background:var(--surface);border:1px solid rgba(92,61,143,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.sum-tags{display:flex;gap:5px;flex-wrap:wrap;}
+.stag{background:var(--purple-l);color:var(--purple);font-size:10px;font-weight:500;padding:2px 8px;border-radius:99px;}
 
-    const cleanPrompt = encodeURIComponent(prompt.trim().substring(0, 500));
-    const seed = Math.floor(Math.random() * 999999);
-    const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+/* ANGLES */
+.angles-section{margin-top:28px;padding-top:24px;border-top:2px dashed rgba(92,61,143,0.2);}
+.angle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px;}
+.angle-card{border:1.5px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;background:var(--surface);transition:all .15s;user-select:none;}
+.angle-card:hover{border-color:var(--purple);transform:translateY(-1px);}
+.angle-card.sel{border-color:var(--purple);background:var(--purple-l);}
+.angle-icon{font-size:18px;margin-bottom:4px;}
+.angle-name{font-size:11px;font-weight:600;color:var(--ink);}
+.angle-card.sel .angle-name{color:var(--purple);}
+.angle-desc{font-size:9px;color:var(--muted);}
+.count-wrap{background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
+.count-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.count-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--purple);}
+.count-slider{width:100%;accent-color:var(--purple);cursor:pointer;}
+.batch-progress{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px;display:none;}
+.batch-progress.show{display:block;}
+.batch-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:12px;margin-bottom:6px;}
+.batch-item.pending{background:var(--cream);color:var(--muted);}
+.batch-item.running{background:#fff8e8;color:#7a5c10;}
+.batch-item.done{background:var(--green-l);color:var(--green);}
+.b-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;}
+.batch-item.running .b-dot{background:var(--gold);animation:pulse .8s ease infinite;}
+.batch-item.done .b-dot{background:var(--green);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-    console.log('Fetching from Pollinations:', imageUrl);
+/* POSES GRID */
+.poses-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px;}
+.pose-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.pose-img-wrap{aspect-ratio:1;background:#f0ece4;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.pose-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
+.mini-spinner{width:20px;height:20px;border:2px solid var(--gold-l);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;}
+.pose-info{padding:8px 10px;display:flex;align-items:center;justify-content:space-between;}
+.pose-name{font-size:11px;font-weight:500;color:var(--ink);}
+.pose-dl-btn{font-size:10px;background:var(--purple-l);color:var(--purple);border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-weight:500;font-family:'DM Sans',sans-serif;}
+.pose-dl-btn:disabled{background:var(--cream);color:var(--muted);cursor:not-allowed;}
+.dl-all-bar{background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.sel-summary-box{background:var(--green-l);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green);margin-bottom:10px;display:none;}
+.sel-summary-box.show{display:block;}
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 55000);
+/* PROC OVERLAY */
+.proc-overlay{position:fixed;inset:0;background:rgba(247,244,239,0.95);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+.proc-overlay.show{display:flex;}
+.proc-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:600;}
+.proc-sub{font-size:12px;color:var(--muted);text-align:center;max-width:260px;}
+.proc-bar-wrap{width:240px;height:4px;background:var(--gold-l);border-radius:99px;overflow:hidden;}
+.proc-bar{height:100%;background:var(--gold);border-radius:99px;width:0%;transition:width .5s ease;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--ink);color:#fff;padding:8px 18px;border-radius:99px;font-size:12px;font-weight:500;opacity:0;transition:all .3s;z-index:999;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.note-box{background:var(--blue-l);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--blue);margin-bottom:14px;line-height:1.6;}
+</style>
+</head>
+<body>
 
-    const imageRes = await fetch(imageUrl, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'FlushionStudio/1.0' }
+<!-- ═══ SCREEN 1: UPLOAD ═══ -->
+<div id="s1" class="screen active">
+  <div class="topbar">
+    <div class="brand">flush<span>ion</span> <small>Studio</small></div>
+    <div class="topbar-right">
+      <div class="tier-toggle">
+        <button class="tier-btn active" id="tier-free-btn" onclick="setTier('free')">Free</button>
+        <button class="tier-btn" id="tier-pro-btn" onclick="setTier('pro')">Pro</button>
+      </div>
+      <div class="api-badge"><div class="dot on"></div><span>Gemini AI Ready</span></div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="steps-bar">
+      <div class="stp active"><div class="stp-n">1</div> Upload</div><div class="sep">›</div>
+      <div class="stp"><div class="stp-n">2</div> AI Detect</div><div class="sep">›</div>
+      <div class="stp"><div class="stp-n">3</div> Generate</div><div class="sep">›</div>
+      <div class="stp"><div class="stp-n">4</div> Download</div>
+    </div>
+    <div class="sec-title">Upload your product image</div>
+    <div class="sec-sub">Any product — saree, garment, jewelry, electronics, food, furniture. AI will automatically detect the type and generate professional prompts.</div>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(event)"/>
+      <div class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <div class="upload-title">Drop images here</div>
+      <div class="upload-hint">Click or drag & drop · JPG, PNG, WEBP · Max 30 images</div>
+    </div>
+    <div id="preview-wrap" style="display:none;">
+      <div id="preview-grid" class="preview-grid"></div>
+      <div id="preview-count" style="font-size:12px;color:var(--muted);margin-bottom:14px;"></div>
+    </div>
+    <textarea class="desc-area" id="user-desc" placeholder="Extra details? (optional) — e.g. 'red silk saree', 'Kanjeevaram', 'white background needed'..."></textarea>
+    <div class="optional-tag">* Optional — AI will detect from the image automatically</div>
+    <button class="btn btn-purple" id="detect-btn" onclick="startDetect()" style="display:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Analyze with AI
+    </button>
+  </div>
+</div>
+
+<!-- ═══ SCREEN 2: DETECT + PROMPT ═══ -->
+<div id="s2" class="screen">
+  <div class="topbar">
+    <div class="brand">flush<span>ion</span> <small>Studio</small></div>
+    <div class="topbar-right">
+      <div class="tier-toggle">
+        <button class="tier-btn active" id="t2-free" onclick="setTier('free')">Free</button>
+        <button class="tier-btn" id="t2-pro" onclick="setTier('pro')">Pro</button>
+      </div>
+    </div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goTo('s1')">← Back</button>
+    <div class="steps-bar">
+      <div class="stp done"><div class="stp-n">✓</div> Upload</div><div class="sep">›</div>
+      <div class="stp active"><div class="stp-n">2</div> AI Detect + Prompt</div><div class="sep">›</div>
+      <div class="stp"><div class="stp-n">3</div> Generate</div><div class="sep">›</div>
+      <div class="stp"><div class="stp-n">4</div> Download</div>
+    </div>
+    <div id="detect-loader" class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-title" id="detect-loader-title">Detecting product type...</div>
+      <div class="loading-sub" id="detect-loader-sub">Gemini AI is analyzing your image</div>
+      <div class="progress-wrap"><div class="progress-bar" id="detect-progress"></div></div>
+    </div>
+    <div id="detect-result" style="display:none;">
+      <div class="detect-card">
+        <img id="detect-img" class="detect-img" src="" alt=""/>
+        <div class="detect-body">
+          <div class="detect-badge" id="detect-category">—</div>
+          <div class="detect-title" id="detect-title">—</div>
+          <div class="detect-desc" id="detect-desc">—</div>
+          <div class="fidelity-list">
+            <div class="fidelity-title">Fidelity Rules — AI will preserve these</div>
+            <div id="fidelity-rules-list"></div>
+          </div>
+          <div style="font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Select Shot Type</div>
+          <div id="shots-grid" class="shots-grid"></div>
+          <div id="prompt-section" style="display:none;margin-bottom:16px;">
+            <div class="prompt-label">Generated Prompt — edit if needed</div>
+            <textarea class="prompt-textarea" id="main-prompt" rows="5"></textarea>
+          </div>
+          <div class="options-grid">
+            <div class="opt-group">
+              <label>Scene / Background</label>
+              <select id="scene-select" onchange="rebuildPrompt()">
+                <option value="">Auto (AI decides)</option>
+                <option value="heritage haveli mughal corridor golden hour sunlight soft warm shadows marble floors">Heritage Haveli / Mughal Corridor</option>
+                <option value="palace courtyard marble floors fountain carved columns diffused sunlight">Palace Courtyard</option>
+                <option value="temple corridor stone pillars warm amber lighting traditional architecture">Temple Corridor</option>
+                <option value="pure white seamless studio background professional lighting">White Studio</option>
+                <option value="natural outdoor garden soft natural light lush greenery">Garden / Outdoor</option>
+                <option value="urban street brick walls city environment candid lifestyle">Urban Street</option>
+                <option value="dark luxury background dramatic spotlight moody">Dark Luxury</option>
+                <option value="rustic wood surface warm tones natural materials">Rustic Wood</option>
+                <option value="light marble stone surface clean premium minimal">White Marble</option>
+              </select>
+            </div>
+            <div class="opt-group">
+              <label>Model Type</label>
+              <select id="model-select" onchange="rebuildPrompt()">
+                <option value="">Auto (from knowledge base)</option>
+                <option value="stunning Indian woman late 20s graceful features deep almond eyes warm honey skin elegant bun serene confident expression">Indian Woman — Traditional</option>
+                <option value="beautiful Indian woman mid 20s expressive eyes modern confident contemporary styling">Indian Woman — Contemporary</option>
+                <option value="beautiful South Indian woman late 20s large expressive eyes warm brown skin jasmine flowers in hair">South Indian Woman</option>
+                <option value="stylish young woman mid 20s sharp features fair complexion sleek straight hair fashion editorial">Western Female — Fashion</option>
+                <option value="professional man early 30s clean cut strong jaw short neat hair confident business expression">Western Male — Professional</option>
+                <option value="no model product only clean background">No Model — Product Only</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-purple" onclick="writeAndGenerate()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Generate Image
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCREEN 3: GENERATE + DOWNLOAD ═══ -->
+<div id="s3" class="screen">
+  <div class="topbar">
+    <div class="brand">flush<span>ion</span> <small>Studio</small></div>
+    <div class="topbar-right">
+      <div class="api-badge"><div class="dot on"></div><span id="s3-status">Processing...</span></div>
+    </div>
+  </div>
+  <div class="body">
+    <button class="back-btn" onclick="goTo('s2')">← Back</button>
+    <div class="steps-bar">
+      <div class="stp done"><div class="stp-n">✓</div> Upload</div><div class="sep">›</div>
+      <div class="stp done"><div class="stp-n">✓</div> Detect + Prompt</div><div class="sep">›</div>
+      <div class="stp active"><div class="stp-n">3</div> Generate + Download</div><div class="sep">›</div>
+      <div class="stp" id="step4"><div class="stp-n">4</div> Done</div>
+    </div>
+
+    <div id="gen-loader" class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-title">Generating image...</div>
+      <div class="loading-sub" id="gen-loader-sub">AI is creating your image — 20-40 seconds</div>
+      <div class="progress-wrap"><div class="progress-bar" id="gen-progress"></div></div>
+    </div>
+
+    <div id="gen-result" style="display:none;">
+      <div class="sec-title">Generated Image</div>
+      <div class="sec-sub">Select download criteria — quality, format, ratio — then download.</div>
+
+      <div class="gen-card">
+        <div class="gen-img-wrap" id="gen-img-wrap">
+          <div class="spinner" id="img-loading-spinner"></div>
+          <img id="gen-img" class="gen-img" src="" alt="Generated" style="display:none;"/>
+          <div class="gen-badge" id="gen-badge">AI Generated</div>
+        </div>
+        <div class="gen-body">
+          <div class="gen-prompt-preview" id="gen-prompt-preview">—</div>
+
+          <div class="dl-box">
+            <div class="dl-sec-title">Quality / Resolution</div>
+            <div class="chip-row">
+              <div class="chip sel" onclick="selChip(this,'q')" data-v="512">Standard <span style="font-size:9px;opacity:.6">512px</span></div>
+              <div class="chip" onclick="selChip(this,'q')" data-v="768">HD <span style="font-size:9px;opacity:.6">768px</span></div>
+              <div class="chip" onclick="selChip(this,'q')" data-v="1024">Full HD <span style="font-size:9px;opacity:.6">1024px</span></div>
+              <div class="chip" onclick="selChip(this,'q')" data-v="1536">2K <span style="font-size:9px;opacity:.6">1536px</span></div>
+              <div class="chip" onclick="selChip(this,'q')" data-v="2048">4K <span style="font-size:9px;opacity:.6">2048px</span></div>
+            </div>
+            <div class="dl-sec-title">Format / Background</div>
+            <div class="fmt-grid">
+              <div class="fmt-card sel" onclick="selFmt(this,'jpg')"><div class="fmt-icon">🖼️</div><div class="fmt-name">JPG</div><div class="fmt-desc">Original background</div></div>
+              <div class="fmt-card" onclick="selFmt(this,'transparent')"><div class="fmt-icon">✂️</div><div class="fmt-name">PNG — No BG</div><div class="fmt-desc">Transparent background</div></div>
+              <div class="fmt-card" onclick="selFmt(this,'white')"><div class="fmt-icon">⬜</div><div class="fmt-name">PNG — White BG</div><div class="fmt-desc">Pure white background</div></div>
+            </div>
+            <div class="dl-sec-title">Aspect Ratio</div>
+            <div class="ratio-row">
+              <div class="ratio-chip sel" onclick="selRatio(this)" data-w="1" data-h="1" data-lbl="1:1"><div class="ratio-box" style="width:20px;height:20px;"></div><div class="ratio-label">1:1</div><div class="ratio-name">Square</div></div>
+              <div class="ratio-chip" onclick="selRatio(this)" data-w="4" data-h="3" data-lbl="4:3"><div class="ratio-box" style="width:24px;height:18px;"></div><div class="ratio-label">4:3</div><div class="ratio-name">Landscape</div></div>
+              <div class="ratio-chip" onclick="selRatio(this)" data-w="3" data-h="4" data-lbl="3:4"><div class="ratio-box" style="width:18px;height:24px;"></div><div class="ratio-label">3:4</div><div class="ratio-name">Portrait</div></div>
+              <div class="ratio-chip" onclick="selRatio(this)" data-w="16" data-h="9" data-lbl="16:9"><div class="ratio-box" style="width:28px;height:16px;"></div><div class="ratio-label">16:9</div><div class="ratio-name">Wide</div></div>
+              <div class="ratio-chip" onclick="selRatio(this)" data-w="9" data-h="16" data-lbl="9:16"><div class="ratio-box" style="width:16px;height:28px;"></div><div class="ratio-label">9:16</div><div class="ratio-name">Reel</div></div>
+              <div class="ratio-chip" onclick="selRatio(this)" data-w="4" data-h="5" data-lbl="4:5"><div class="ratio-box" style="width:18px;height:22px;"></div><div class="ratio-label">4:5</div><div class="ratio-name">Instagram</div></div>
+              <div class="ratio-chip" onclick="selRatio(this)" data-w="1" data-h="1.414" data-lbl="A4"><div class="ratio-box" style="width:18px;height:25px;"></div><div class="ratio-label">A4</div><div class="ratio-name">Print</div></div>
+            </div>
+          </div>
+
+          <div class="dl-summary">
+            <div style="font-size:11px;color:var(--muted);">Download settings:</div>
+            <div class="sum-tags">
+              <span class="stag" id="sum-q">512px</span>
+              <span class="stag" id="sum-f">JPG</span>
+              <span class="stag" id="sum-r">1:1</span>
+              <span class="stag" id="sum-d">512×512</span>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="btn btn-primary" id="dl-btn" onclick="downloadFinal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Image
+            </button>
+            <button class="btn btn-outline" onclick="regenNow()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Regenerate
+            </button>
+          </div>
+
+          <!-- ANGLES SECTION -->
+          <div class="angles-section">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;">Different Angles / Poses</div>
+              <div style="background:var(--purple);color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;">NEW</div>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Generate the same product from different angles. Select multiple, set count per angle.</div>
+
+            <div class="angle-grid">
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="front view" data-p="front view, facing camera directly"><div class="angle-icon">⬆️</div><div class="angle-name">Front</div><div class="angle-desc">Straight on</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="back view" data-p="back view, seen from behind"><div class="angle-icon">⬇️</div><div class="angle-name">Back</div><div class="angle-desc">From behind</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="left side profile" data-p="left side profile view 90 degrees"><div class="angle-icon">⬅️</div><div class="angle-name">Left Side</div><div class="angle-desc">90° left</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="right side profile" data-p="right side profile view 90 degrees"><div class="angle-icon">➡️</div><div class="angle-name">Right Side</div><div class="angle-desc">90° right</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="three quarter left 45 degree" data-p="three quarter view from left 45 degree angle"><div class="angle-icon">↖️</div><div class="angle-name">45° Left</div><div class="angle-desc">Diagonal</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="three quarter right 45 degree" data-p="three quarter view from right 45 degree angle"><div class="angle-icon">↗️</div><div class="angle-name">45° Right</div><div class="angle-desc">Diagonal</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="overhead top down" data-p="overhead top down bird eye view"><div class="angle-icon">🔽</div><div class="angle-name">Top Down</div><div class="angle-desc">Bird's eye</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="low angle worms eye" data-p="low angle worms eye view looking up"><div class="angle-icon">🔼</div><div class="angle-name">Low Angle</div><div class="angle-desc">Looking up</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="extreme close up macro detail" data-p="extreme close up macro detail shallow depth of field"><div class="angle-icon">🔍</div><div class="angle-name">Close Up</div><div class="angle-desc">Macro</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="full body head to toe" data-p="full body shot complete head to toe"><div class="angle-icon">🧍</div><div class="angle-name">Full Body</div><div class="angle-desc">Head to toe</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="dynamic action movement" data-p="dynamic action movement pose energetic editorial"><div class="angle-icon">💃</div><div class="angle-name">Dynamic</div><div class="angle-desc">Action pose</div></div>
+              <div class="angle-card" onclick="toggleAngle(this)" data-angle="flat lay overhead ecommerce" data-p="flat lay composition overhead product on clean surface"><div class="angle-icon">📐</div><div class="angle-name">Flat Lay</div><div class="angle-desc">E-commerce</div></div>
+            </div>
+
+            <div class="count-wrap">
+              <div class="count-header">
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Images per angle</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:2px;">Total = angles × count</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="count-val" id="count-val">1</div>
+                  <div style="font-size:10px;color:var(--muted);">per angle</div>
+                </div>
+              </div>
+              <input type="range" class="count-slider" id="count-slider" min="1" max="10" value="1" step="1" oninput="updateCount(this.value)"/>
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;">
+                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              </div>
+            </div>
+
+            <textarea class="desc-area" id="angle-extra" placeholder="Extra requirements for angles? — e.g. 'outdoor background', 'dramatic lighting', 'highlight jewelry'..."></textarea>
+            <div class="optional-tag">* Optional extra description</div>
+
+            <div class="sel-summary-box" id="sel-summary">—</div>
+
+            <div class="action-row" style="margin-bottom:20px;">
+              <button class="btn btn-purple" id="gen-angles-btn" onclick="generateAngles()" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span id="angles-btn-label">Select angles first</span>
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="clearAngles()">Clear</button>
+            </div>
+
+            <div class="batch-progress" id="batch-progress">
+              <div style="font-size:13px;font-weight:500;margin-bottom:10px;">Generating poses...</div>
+              <div id="batch-items"></div>
+              <div style="margin-top:8px;">
+                <div class="progress-wrap" style="width:100%;"><div class="progress-bar" id="batch-bar"></div></div>
+                <div id="batch-count" style="font-size:11px;color:var(--muted);margin-top:4px;">0 / 0</div>
+              </div>
+            </div>
+
+            <div id="poses-result" style="display:none;">
+              <div style="font-size:14px;font-weight:500;margin-bottom:12px;">Generated Poses</div>
+              <div id="poses-grid" class="poses-grid"></div>
+              <div class="dl-all-bar">
+                <div style="font-size:12px;color:var(--muted);"><strong id="poses-count">0</strong> poses ready</div>
+                <button class="btn btn-purple btn-sm" onclick="downloadAllPoses()">Download All</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
+            <button class="btn btn-outline" onclick="startOver()" style="width:100%;justify-content:center;">Start New Project →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="proc-overlay" id="proc-overlay">
+  <div class="spinner"></div>
+  <div class="proc-title" id="proc-title">Processing...</div>
+  <div class="proc-sub" id="proc-sub">Please wait</div>
+  <div class="proc-bar-wrap"><div class="proc-bar" id="proc-bar"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let tier='free', uploadedFiles=[], currentPrompt='', currentGenUrl='';
+let selectedAngles=[], poseCount=1, generatedPoseUrls=[];
+let detectedCategory='', detectedFidelityRules=[], selectedShot=null;
+let dl={q:512,fmt:'jpg',rw:1,rh:1,rl:'1:1'};
+let _catData=null, _subType='', _promptBase='';
+
+const KB={
+  detect_keywords:{
+    'saree':['saree','sari','pallu','pleats','drape','ikat','zari','banarasi','kanjeevaram','patola','chanderi','bandhani','silk saree','ethnic drape'],
+    'western_fashion':['shirt','tshirt','t-shirt','dress','blazer','jacket','jeans','denim','hoodie','skirt','suit','trousers','pants','coat','western','fashion','garment'],
+    'jewelry':['necklace','earring','ring','bracelet','bangle','pendant','chain','jewelry','jewellery','gold','silver','diamond','gem','choker','jhumka','kundan'],
+    'electronics':['phone','mobile','laptop','tablet','camera','watch','headphone','speaker','gadget','device','screen','computer'],
+    'food':['food','dish','meal','drink','beverage','fruit','vegetable','cake','bread','curry','rice','coffee','tea','dessert'],
+    'furniture':['chair','sofa','table','desk','bed','shelf','cabinet','lamp','couch','furniture','interior','cushion'],
+    'footwear':['shoe','sandal','heel','boot','sneaker','slipper','footwear','chappal','loafer'],
+    'bag':['bag','purse','handbag','clutch','backpack','tote','wallet','pouch','sling bag'],
+    'beauty':['lipstick','foundation','mascara','eyeshadow','perfume','cream','serum','moisturizer','cosmetic','makeup','skincare','beauty']
+  },
+  categories:{
+    'saree':{display:'Saree / Ethnic Wear',shots:[{id:'S01',name:'Hero Full Body',lens:'50mm, eye level',focus:'Full drape front, pallu over shoulder'},{id:'S02',name:'Three-Quarter',lens:'85mm, slight angle',focus:'Walking pose, pallu flowing'},{id:'S03',name:'Medium Waist-Up',lens:'85mm portrait',focus:'Hands joined, border visible'},{id:'S04',name:'Close-Up Pallu',lens:'135mm telephoto',focus:'Tassels, zari, fringe detail'},{id:'S05',name:'Detail Border',lens:'100mm macro',focus:'Border pattern, fabric texture'},{id:'S06',name:'Flat Lay',lens:'Top-down',focus:'Saree spread, jewelry arranged'}],default_scene:'heritage haveli mughal corridor golden hour sunlight soft warm shadows marble floors',default_model:'stunning Indian woman late 20s graceful features deep almond eyes warm honey skin elegant bun serene confident expression',negative:'cartoon, illustration, anime, CGI, 3D render, crushed fabric, visible petticoat, wrong draping, missing pleats, floating pallu, blurred pattern, skin orange cast'},
+    'western_fashion':{display:'Western Fashion',shots:[{id:'W01',name:'Hero Front',lens:'50mm, eye level',focus:'Full body, straight front'},{id:'W02',name:'Three-Quarter',lens:'85mm, slight angle',focus:'Dynamic 3/4, one foot forward'},{id:'W03',name:'Back View',lens:'50mm, eye level',focus:'Back design visible'},{id:'W04',name:'Detail Close-Up',lens:'100mm macro',focus:'Fabric, print, logo, stitching'},{id:'W05',name:'Lifestyle',lens:'35mm wide',focus:'Model in environment, candid'},{id:'W06',name:'Flat Lay',lens:'Top-down studio',focus:'Product on clean surface'}],default_scene:'minimalist studio seamless light grey background professional fashion photography',default_model:'stylish young woman mid 20s sharp features fair to medium complexion sleek straight hair fashion editorial',negative:'wrong fit, stretched fabric, missing buttons, blurred logo, CGI, illustration, wrong proportions'},
+    'jewelry':{display:'Jewelry & Accessories',shots:[{id:'J01',name:'Hero Product',lens:'100mm macro',focus:'Jewelry on surface, perfect light'},{id:'J02',name:'Detail Texture',lens:'100mm extreme close',focus:'Stone, clasp, pattern detail'},{id:'J03',name:'Worn Hero',lens:'85mm, eye level',focus:'Worn by model, full context'},{id:'J04',name:'Worn Detail',lens:'100mm medium',focus:'Close-up on neck/wrist/ear'},{id:'J05',name:'Flat Lay Set',lens:'Top-down',focus:'Complete set arranged artistically'}],default_scene:'velvet display surface dark background dramatic spot lighting professional product photography',default_model:'beautiful Indian woman late 20s elegant features warm skin tone traditional styling',negative:'plastic-looking metal, wrong metal color, floating jewelry, oversized scale, CGI, cartoon'},
+    'electronics':{display:'Electronics & Products',shots:[{id:'E01',name:'Hero Front',lens:'50mm, eye level',focus:'Product straight-on front'},{id:'E02',name:'3/4 Angle',lens:'50mm, elevated 3/4',focus:'Classic product reveal angle'},{id:'E03',name:'Detail Close-Up',lens:'100mm',focus:'Port, button, texture detail'},{id:'E04',name:'Lifestyle',lens:'35mm, natural light',focus:'Person using product in context'},{id:'E05',name:'Floating',lens:'Studio seamless',focus:'Product floating on white'}],default_scene:'pure white seamless background professional product photography studio',default_model:'no model product only',negative:'wrong brand name, incorrect button placement, CGI fake reflection, wrong proportions, cartoon'},
+    'food':{display:'Food & Beverages',shots:[{id:'FD01',name:'Hero Overhead',lens:'Top-down 35-50mm',focus:'Classic flat lay food shot'},{id:'FD02',name:'45-Degree',lens:'50mm, 45 degrees',focus:'Layers, height, depth'},{id:'FD03',name:'Close-Up Texture',lens:'100mm macro',focus:'Texture, sauce, garnish'},{id:'FD04',name:'Lifestyle Hands',lens:'50mm side',focus:'Hands serving or handling'}],default_scene:'light marble surface clean premium food photography soft natural light',default_model:'no model product only',negative:'unappetizing, wilted, stale, plastic-looking, CGI food, cartoon'},
+    'furniture':{display:'Furniture & Home Decor',shots:[{id:'H01',name:'Hero 3/4 Front',lens:'35-50mm eye level',focus:'Classic furniture reveal'},{id:'H02',name:'Detail',lens:'100mm',focus:'Material, joinery, hardware'},{id:'H03',name:'Lifestyle Styled',lens:'35mm wide',focus:'In room with decor'},{id:'H04',name:'Overhead Table',lens:'Top-down',focus:'Table surface styling'}],default_scene:'styled room interior natural light from windows matching decor',default_model:'no model product only',negative:'wrong wood grain, plastic-looking wood, incorrect proportions, floating furniture, CGI'},
+    'footwear':{display:'Footwear',shots:[{id:'SH01',name:'Hero Side Profile',lens:'85mm side',focus:'Classic shoe side shot'},{id:'SH02',name:'3/4 Front',lens:'85mm elevated 3/4',focus:'Depth, toe, upper'},{id:'SH03',name:'Pair Top-Down',lens:'Top-down 50mm',focus:'Both shoes from above'},{id:'SH04',name:'Detail',lens:'100mm macro',focus:'Logo, stitching, material'},{id:'SH05',name:'On-Foot',lens:'35mm full body',focus:'Worn in context'}],default_scene:'clean studio seamless background professional product photography',default_model:'stylish person casual lifestyle styling',negative:'wrong sole thickness, incorrect toe shape, blurry logo, CGI plastic, wrong proportions'},
+    'bag':{display:'Bags & Leather Goods',shots:[{id:'B01',name:'Hero Front',lens:'85mm eye level',focus:'Front face clean'},{id:'B02',name:'3/4 Angle',lens:'85mm 3/4',focus:'Depth and side panel'},{id:'B03',name:'Detail Hardware',lens:'100mm macro',focus:'Clasp, logo, zipper'},{id:'B04',name:'Interior Open',lens:'50mm overhead',focus:'Interior organization'},{id:'B05',name:'Lifestyle Carried',lens:'50mm 3/4 body',focus:'Model carrying in context'}],default_scene:'pure white seamless or dark luxury background professional photography',default_model:'stylish woman mid 20s contemporary fashion styling',negative:'wrong leather texture, incorrect hardware, missing stitching, wrong logo, plastic-looking leather'},
+    'beauty':{display:'Beauty & Cosmetics',shots:[{id:'C01',name:'Hero Product',lens:'85-100mm front',focus:'Product alone clean background'},{id:'C02',name:'Texture Formula',lens:'100mm macro',focus:'Texture, formula, swatch'},{id:'C03',name:'Collection Flat Lay',lens:'Top-down',focus:'Full range artistically arranged'},{id:'C04',name:'Model Application',lens:'85mm beauty',focus:'Model wearing product'}],default_scene:'pure white marble surface clean premium beauty photography soft light',default_model:'beautiful woman flawless skin contemporary makeup styling',negative:'wrong packaging color, blurry label, CGI render, wrong shade, illustration'}
+  }
+};
+
+function setTier(t){
+  tier=t;
+  document.querySelectorAll('.tier-btn').forEach(b=>b.classList.remove('active'));
+  if(t==='free'){document.querySelectorAll('#tier-free-btn,#t2-free').forEach(b=>b.classList.add('active'));}
+  else{document.querySelectorAll('#tier-pro-btn,#t2-pro').forEach(b=>b.classList.add('active'));}
+}
+
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function handleFiles(e){
+  const files=Array.from(e.target.files).slice(0,30);
+  if(!files.length)return;
+  uploadedFiles=files;
+  const grid=document.getElementById('preview-grid');
+  grid.innerHTML='';
+  files.forEach(f=>{
+    const d=document.createElement('div');d.className='preview-thumb';
+    const img=document.createElement('img');img.src=URL.createObjectURL(f);
+    d.appendChild(img);grid.appendChild(d);
+  });
+  document.getElementById('preview-wrap').style.display='block';
+  document.getElementById('preview-count').textContent=files.length+' image'+(files.length>1?'s':'')+' selected';
+  document.getElementById('detect-btn').style.display='inline-flex';
+}
+
+const zone=document.getElementById('upload-zone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.style.borderColor='var(--purple)';});
+zone.addEventListener('dragleave',()=>{zone.style.borderColor='';});
+zone.addEventListener('drop',e=>{
+  e.preventDefault();zone.style.borderColor='';
+  const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')).slice(0,30);
+  if(!files.length)return;
+  uploadedFiles=files;
+  const dt=new DataTransfer();files.forEach(f=>dt.items.add(f));
+  document.getElementById('file-input').files=dt.files;
+  handleFiles({target:{files:dt.files}});
+});
+
+async function startDetect(){
+  if(!uploadedFiles.length){showToast('Please upload an image first');return;}
+  goTo('s2');
+  document.getElementById('detect-loader').style.display='block';
+  document.getElementById('detect-result').style.display='none';
+  document.getElementById('detect-img').src=URL.createObjectURL(uploadedFiles[0]);
+  setProgress('detect-progress',20);
+  await detectWithGemini();
+}
+
+async function detectWithGemini(){
+  try{
+    const b64=await toBase64(uploadedFiles[0]);
+    const ud=document.getElementById('user-desc').value.trim();
+    setProgress('detect-progress',40);
+    document.getElementById('detect-loader-title').textContent='Gemini AI analyzing image...';
+    document.getElementById('detect-loader-sub').textContent='Detecting product type, sub-type and fidelity rules...';
+    const res=await fetch('/api/analyze',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({imageBase64:b64,mimeType:uploadedFiles[0].type,userDesc:ud})
     });
-    clearTimeout(timeout);
-
-    if (!imageRes.ok) throw new Error(`Pollinations error: ${imageRes.status}`);
-
-    const buffer = await imageRes.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
-    const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
-
-    return res.status(200).json({
-      success: true,
-      image: `data:${contentType};base64,${base64}`,
-      url: imageUrl
-    });
-
-  } catch (err) {
-    console.error('Generate error:', err.message);
-    return res.status(500).json({ error: err.message || 'Generation failed' });
+    const result=await res.json();
+    if(!result.success)throw new Error(result.error||'API error');
+    setProgress('detect-progress',90);
+    const d=result.data;
+    showDetectResult(d.category,d.sub_type,d.title,d.description,d.fidelity_rules,d.generation_prompt);
+  }catch(err){
+    showToast('Gemini error — using demo mode');
+    await detectDemo();
   }
 }
+
+async function detectDemo(){
+  await sleep(1500);
+  const ud=document.getElementById('user-desc').value.toLowerCase();
+  const fname=(uploadedFiles[0]?.name||'').toLowerCase();
+  const combined=ud+' '+fname;
+  let bestCat='saree',bestScore=0;
+  for(const[cat,kws]of Object.entries(KB.detect_keywords)){
+    const score=kws.filter(k=>combined.includes(k)).length;
+    if(score>bestScore){bestScore=score;bestCat=cat;}
+  }
+  const cd=KB.categories[bestCat];
+  showDetectResult(bestCat,'Auto-detected',cd.display,'This is a '+cd.display+' product image. AI has loaded fidelity rules from the knowledge base. (Demo mode — Gemini API will provide precise detection)',cd.universal_fidelity||['Preserve original colors and patterns','Material texture must be accurate','Proportions must match reference','Professional commercial quality'],'Professional '+cd.display+' product photography, high quality, detailed, sharp focus');
+}
+
+function showDetectResult(category,subType,title,description,fidelityRules,promptBase){
+  detectedCategory=category;
+  detectedFidelityRules=fidelityRules||[];
+  _subType=subType;
+  _promptBase=promptBase;
+  const cd=KB.categories[category]||KB.categories['saree'];
+  _catData=cd;
+  document.getElementById('detect-category').textContent=cd.display+(subType&&subType!=='Auto-detected'?' — '+subType:'');
+  document.getElementById('detect-title').textContent=title;
+  document.getElementById('detect-desc').textContent=description;
+  const fl=document.getElementById('fidelity-rules-list');
+  fl.innerHTML='';
+  (fidelityRules||[]).slice(0,5).forEach(r=>{
+    fl.innerHTML+=`<div class="fidelity-item"><div class="fi-dot"></div><div>${r}</div></div>`;
+  });
+  const sg=document.getElementById('shots-grid');
+  sg.innerHTML='';
+  (cd.shots||[]).forEach((shot,i)=>{
+    const card=document.createElement('div');
+    card.className='shot-card'+(i===0?' sel':'');
+    card.innerHTML=`<div class="shot-id">${shot.id}</div><div class="shot-name">${shot.name}</div><div class="shot-lens">${shot.lens}</div>`;
+    card.onclick=()=>{
+      document.querySelectorAll('.shot-card').forEach(c=>c.classList.remove('sel'));
+      card.classList.add('sel');
+      selectedShot=shot;
+      buildPrompt();
+    };
+    sg.appendChild(card);
+  });
+  selectedShot=cd.shots[0];
+  buildPrompt();
+  document.getElementById('detect-loader').style.display='none';
+  document.getElementById('detect-result').style.display='block';
+  document.getElementById('prompt-section').style.display='block';
+}
+
+function buildPrompt(){
+  if(!_catData||!selectedShot)return;
+  const scene=document.getElementById('scene-select').value||_catData.default_scene;
+  const modelChoice=document.getElementById('model-select').value||_catData.default_model;
+  const isNoModel=modelChoice.toLowerCase().includes('no model')||modelChoice.toLowerCase().includes('product only');
+  const fidelityStr=(detectedFidelityRules||[]).slice(0,3).join('. ');
+  let prompt='';
+  if(isNoModel){
+    prompt=`Professional product photography. ${_promptBase}. Shot: ${selectedShot.name} using ${selectedShot.lens}. Scene: ${scene}. Focus: ${selectedShot.focus}. Fidelity: ${fidelityStr}. High quality, sharp, commercial grade photography. Negative: ${_catData.negative||''}`;
+  }else{
+    prompt=`The black rectangles covering faces in reference images are masking — ignore them. Generate new model: ${modelChoice}. Use reference for garment/product only. ${_promptBase}. Model wearing/using it. Scene: ${scene}. Shot: ${selectedShot.name} using ${selectedShot.lens}. Pose: ${selectedShot.focus}. Fidelity requirements: ${fidelityStr}. Negative: ${_catData.negative||''}`;
+  }
+  currentPrompt=prompt;
+  document.getElementById('main-prompt').value=prompt;
+}
+
+function rebuildPrompt(){buildPrompt();}
+
+function writeAndGenerate(){
+  currentPrompt=document.getElementById('main-prompt').value.trim();
+  if(!currentPrompt){showToast('Prompt is empty');return;}
+  startGeneration();
+}
+
+function startGeneration(){
+  goTo('s3');
+  document.getElementById('gen-loader').style.display='block';
+  document.getElementById('gen-result').style.display='none';
+  document.getElementById('s3-status').textContent='Generating...';
+  selectedAngles=[];generatedPoseUrls=[];
+  document.getElementById('batch-progress').classList.remove('show');
+  document.getElementById('poses-result').style.display='none';
+  generateImage(currentPrompt,dl.q,dl.rw,dl.rh,showGenResult);
+}
+
+async function generateImage(prompt,size,rw,rh,callback){
+  const w=Math.round(size),h=Math.round(size*(rh/rw));
+  const seed=Math.floor(Math.random()*999999);
+  let p=15;
+  const iv=setInterval(()=>{p=Math.min(p+3,80);setProgress('gen-progress',p);},2000);
+  try{
+    const res=await fetch('/api/generate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt,width:w,height:h,seed})
+    });
+    const data=await res.json();
+    clearInterval(iv);setProgress('gen-progress',100);
+    if(data.image){callback(data.image);}
+    else if(data.imageUrl){callback(data.imageUrl);}
+    else throw new Error('No image URL');
+  }catch(err){
+    clearInterval(iv);
+    // Direct fallback
+    const enc=encodeURIComponent(prompt.slice(0,500)+', professional photography, highly detailed, sharp focus');
+    callback(`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`);
+  }
+}
+
+function showGenResult(src){
+  currentGenUrl=src;
+  document.getElementById('gen-loader').style.display='none';
+  document.getElementById('gen-result').style.display='block';
+  document.getElementById('s3-status').textContent='Ready';
+  document.getElementById('gen-prompt-preview').textContent=currentPrompt.slice(0,200)+(currentPrompt.length>200?'...':'');
+  updateSummary();
+
+  // Show image with loading state
+  const wrap=document.getElementById('gen-img-wrap');
+  const spinner=document.getElementById('img-loading-spinner');
+  const imgEl=document.getElementById('gen-img');
+
+  spinner.style.display='block';
+  imgEl.style.display='none';
+
+  imgEl.onload=()=>{
+    spinner.style.display='none';
+    imgEl.style.display='block';
+    showToast('Image ready!');
+  };
+  imgEl.onerror=()=>{
+    // If base64 failed (shouldn't), or URL failed — show fallback
+    if(src && src.startsWith('data:')){
+      // base64 loaded but onerror — just show it anyway
+      spinner.style.display='none';
+      imgEl.style.display='block';
+    } else {
+      const enc=encodeURIComponent(currentPrompt.slice(0,400)+', professional photography');
+      const fallback=`https://image.pollinations.ai/prompt/${enc}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random()*99999)}`;
+      if(imgEl.src!==fallback){
+        imgEl.src=fallback;
+        currentGenUrl=fallback;
+      }else{
+        spinner.style.display='none';
+        imgEl.style.display='block';
+        showToast('Image loaded');
+      }
+    }
+  };
+  imgEl.src=src;
+}
+
+// ═══ DOWNLOAD CRITERIA ═══
+function selChip(el,grp){
+  el.closest('.chip-row').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  if(grp==='q'){dl.q=parseInt(el.dataset.v);updateSummary();}
+}
+function selFmt(el,fmt){document.querySelectorAll('.fmt-card').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dl.fmt=fmt;updateSummary();}
+function selRatio(el){document.querySelectorAll('.ratio-chip').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');dl.rw=parseFloat(el.dataset.w);dl.rh=parseFloat(el.dataset.h);dl.rl=el.dataset.lbl;updateSummary();}
+function updateSummary(){
+  const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
+  document.getElementById('sum-q').textContent=dl.q>=2048?'4K':dl.q>=1536?'2K':dl.q+'px';
+  document.getElementById('sum-f').textContent={jpg:'JPG',transparent:'PNG (No BG)',white:'PNG (White BG)'}[dl.fmt];
+  document.getElementById('sum-r').textContent=dl.rl;
+  document.getElementById('sum-d').textContent=w+'×'+h;
+}
+
+// ═══ DOWNLOAD — FIXED ═══
+async function downloadFinal(){
+  const btn=document.getElementById('dl-btn');
+  btn.disabled=true;btn.textContent='Preparing...';
+  showProc('Preparing download...','Applying format and resolution settings');
+  try{
+    const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
+    setProc(20,'Loading image at selected resolution...');
+
+    // Use the stored image (base64 or URL) — no re-generation needed
+    const imgEl=await loadImgCORS(currentGenUrl);
+    setProc(70,'Processing canvas...');
+
+    const canvas=document.createElement('canvas');
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d');
+
+    if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);}
+    ctx.drawImage(imgEl,0,0,w,h);
+    if(dl.fmt==='transparent'){setProc(80,'Removing background...');removeBg(ctx,w,h);}
+
+    setProc(95,'Creating file...');
+    await sleep(200);
+
+    const ext=dl.fmt==='jpg'?'jpg':'png';
+    const mime=dl.fmt==='jpg'?'image/jpeg':'image/png';
+    const quality=dl.fmt==='jpg'?0.95:undefined;
+
+    canvas.toBlob(blob=>{
+      if(!blob){
+        hideProc();
+        directDownload(currentGenUrl,ext);
+        return;
+      }
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`flushion-${dl.rl.replace(':','x')}-${w}x${h}-${Date.now()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      hideProc();
+      showToast('Image downloaded!');
+      btn.disabled=false;
+      btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
+      document.getElementById('step4').classList.add('done');
+    },mime,quality);
+
+  }catch(err){
+    hideProc();
+    showToast('Downloading directly...');
+    directDownload(currentGenUrl,'jpg');
+    btn.disabled=false;
+    btn.textContent='Download Image';
+  }
+}
+
+function directDownload(url,ext){
+  const a=document.createElement('a');
+  a.href=url;a.target='_blank';
+  a.download=`flushion-${Date.now()}.${ext||'jpg'}`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast('Opening image — right-click to save');
+}
+
+function loadImgCORS(url){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>res(img);
+    img.onerror=()=>{
+      // Try without CORS
+      const img2=new Image();
+      img2.onload=()=>res(img2);
+      img2.onerror=rej;
+      img2.src=url;
+    };
+    img.src=url+'&t='+Date.now();
+  });
+}
+
+function regenNow(){startGeneration();}
+
+// ═══ ANGLES ═══
+function toggleAngle(el){
+  el.classList.toggle('sel');
+  const a={angle:el.dataset.angle,prompt:el.dataset.p};
+  if(el.classList.contains('sel'))selectedAngles.push(a);
+  else selectedAngles=selectedAngles.filter(x=>x.angle!==a.angle);
+  updateAnglesUI();
+}
+function clearAngles(){document.querySelectorAll('.angle-card').forEach(c=>c.classList.remove('sel'));selectedAngles=[];updateAnglesUI();}
+function updateCount(v){poseCount=parseInt(v);document.getElementById('count-val').textContent=v;updateAnglesUI();}
+function updateAnglesUI(){
+  const total=selectedAngles.length*poseCount;
+  const btn=document.getElementById('gen-angles-btn');
+  const lbl=document.getElementById('angles-btn-label');
+  const sum=document.getElementById('sel-summary');
+  if(selectedAngles.length===0){btn.disabled=true;lbl.textContent='Select angles first';sum.classList.remove('show');}
+  else{
+    btn.disabled=false;
+    lbl.textContent='Generate '+total+' image'+(total>1?'s':'');
+    sum.textContent=selectedAngles.length+' angle(s): '+selectedAngles.map(a=>a.angle).join(', ')+' × '+poseCount+' = '+total+' total';
+    sum.classList.add('show');
+  }
+}
+
+async function generateAngles(){
+  if(!selectedAngles.length){showToast('Please select angles first');return;}
+  const extra=document.getElementById('angle-extra').value.trim();
+  const total=selectedAngles.length*poseCount;
+  generatedPoseUrls=[];
+
+  const tasks=[];
+  selectedAngles.forEach(a=>{for(let i=0;i<poseCount;i++)tasks.push({...a,variation:i+1});});
+
+  const batchEl=document.getElementById('batch-progress');
+  const batchItems=document.getElementById('batch-items');
+  batchEl.classList.add('show');batchItems.innerHTML='';
+  setProgress('batch-bar',0);document.getElementById('batch-count').textContent='0 / '+total;
+
+  const itemEls=[],cardEls=[];
+  tasks.forEach((t,i)=>{
+    const d=document.createElement('div');d.className='batch-item pending';
+    const label=t.variation>1?t.angle+' v'+t.variation:t.angle;
+    d.innerHTML=`<div class="b-dot"></div><span>${label}</span>`;
+    batchItems.appendChild(d);itemEls.push(d);
+  });
+
+  const posesResult=document.getElementById('poses-result');
+  const posesGrid=document.getElementById('poses-grid');
+  posesResult.style.display='block';posesGrid.innerHTML='';
+
+  tasks.forEach((t,i)=>{
+    const card=document.createElement('div');card.className='pose-card';
+    const label=t.variation>1?t.angle+' v'+t.variation:t.angle;
+    card.innerHTML=`<div class="pose-img-wrap" id="pose-wrap-${i}"><div class="mini-spinner"></div></div><div class="pose-info"><div class="pose-name">${label}</div><button class="pose-dl-btn" id="pose-dl-${i}" onclick="downloadPose(${i})" disabled>Download</button></div>`;
+    posesGrid.appendChild(card);cardEls.push(card);
+  });
+
+  document.getElementById('poses-count').textContent='0';
+  posesResult.scrollIntoView({behavior:'smooth',block:'start'});
+
+  let done=0;
+  for(let i=0;i<tasks.length;i++){
+    const t=tasks[i];
+    itemEls[i].className='batch-item running';
+    const fullPrompt=currentPrompt+', '+t.prompt+(extra?', '+extra:'')+', professional quality, sharp focus';
+    const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
+    const seed=Math.floor(Math.random()*999999);
+    const enc=encodeURIComponent(fullPrompt.slice(0,500));
+    const url=`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
+    generatedPoseUrls[i]=url;
+
+    await new Promise(resolve=>{
+      const img=new Image();
+      const timeout=setTimeout(()=>resolve(),15000);
+      img.onload=()=>{clearTimeout(timeout);resolve();};
+      img.onerror=()=>{clearTimeout(timeout);resolve();};
+      img.src=url;
+    });
+
+    // Update pose card with image
+    const wrap=document.getElementById('pose-wrap-'+i);
+    if(wrap){
+      const img=document.createElement('img');
+      img.src=url;
+      img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+      img.onerror=()=>{img.style.display='none';};
+      wrap.innerHTML='';
+      wrap.appendChild(img);
+    }
+
+    const dlBtn=document.getElementById('pose-dl-'+i);
+    if(dlBtn)dlBtn.disabled=false;
+
+    itemEls[i].className='batch-item done';
+    done++;
+    setProgress('batch-bar',Math.round((done/total)*100));
+    document.getElementById('batch-count').textContent=done+' / '+total;
+    document.getElementById('poses-count').textContent=done;
+  }
+  showToast(total+' poses ready!');
+}
+
+async function downloadPose(idx){
+  const url=generatedPoseUrls[idx];if(!url)return;
+  try{
+    const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
+    const imgEl=await loadImgCORS(url);
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);}
+    ctx.drawImage(imgEl,0,0,w,h);
+    if(dl.fmt==='transparent')removeBg(ctx,w,h);
+    const ext=dl.fmt==='jpg'?'jpg':'png',mime=dl.fmt==='jpg'?'image/jpeg':'image/png';
+    canvas.toBlob(blob=>{
+      if(!blob){directDownload(url,ext);return;}
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`flushion-pose-${idx+1}-${Date.now()}.${ext}`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      showToast('Pose '+(idx+1)+' downloaded!');
+    },mime,0.95);
+  }catch(e){directDownload(url,'jpg');}
+}
+
+async function downloadAllPoses(){
+  if(!generatedPoseUrls.length)return;
+  showToast('Downloading all poses...');
+  for(let i=0;i<generatedPoseUrls.length;i++){await sleep(600);await downloadPose(i);}
+  showToast('All poses downloaded!');
+}
+
+function startOver(){
+  uploadedFiles=[];selectedAngles=[];generatedPoseUrls=[];
+  document.getElementById('preview-grid').innerHTML='';
+  document.getElementById('preview-wrap').style.display='none';
+  document.getElementById('detect-btn').style.display='none';
+  document.getElementById('user-desc').value='';
+  document.getElementById('file-input').value='';
+  goTo('s1');showToast('New project started!');
+}
+
+function removeBg(ctx,w,h){
+  const id=ctx.getImageData(0,0,w,h),d=id.data;
+  const c=[[d[0],d[1],d[2]],[d[(w-1)*4],d[(w-1)*4+1],d[(w-1)*4+2]],[d[(h-1)*w*4],d[(h-1)*w*4+1],d[(h-1)*w*4+2]],[d[((h-1)*w+w-1)*4],d[((h-1)*w+w-1)*4+1],d[((h-1)*w+w-1)*4+2]]];
+  const br=Math.round(c.reduce((s,x)=>s+x[0],0)/4),bg=Math.round(c.reduce((s,x)=>s+x[1],0)/4),bb=Math.round(c.reduce((s,x)=>s+x[2],0)/4),tol=45;
+  for(let i=0;i<d.length;i+=4){if(Math.abs(d[i]-br)<tol&&Math.abs(d[i+1]-bg)<tol&&Math.abs(d[i+2]-bb)<tol)d[i+3]=0;}
+  ctx.putImageData(id,0,0);
+}
+function toBase64(file){return new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.onerror=j;rd.readAsDataURL(file);});}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function setProgress(id,pct){const el=document.getElementById(id);if(el)el.style.width=pct+'%';}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function showProc(t,s){document.getElementById('proc-title').textContent=t;document.getElementById('proc-sub').textContent=s;document.getElementById('proc-bar').style.width='10%';document.getElementById('proc-overlay').classList.add('show');}
+function setProc(p,s){document.getElementById('proc-bar').style.width=p+'%';if(s)document.getElementById('proc-sub').textContent=s;}
+function hideProc(){document.getElementById('proc-bar').style.width='100%';setTimeout(()=>document.getElementById('proc-overlay').classList.remove('show'),500);}
+</script>
+</body>
+</html>
