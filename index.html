@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -717,23 +717,12 @@ function showGenResult(src){
   spinner.style.display='block';
   imgEl.style.display='none';
 
-  imgEl.onload=()=>{
-    spinner.style.display='none';
-    imgEl.style.display='block';
-    showToast('Image ready!');
-  };
+  let _r=0;
+  imgEl.onload=()=>{spinner.style.display='none';imgEl.style.display='block';showToast('Image ready!');};
   imgEl.onerror=()=>{
-    // Try direct URL if something failed
-    const enc=encodeURIComponent(currentPrompt.slice(0,400)+', professional photography');
-    const fallback=`https://image.pollinations.ai/prompt/${enc}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random()*99999)}`;
-    if(imgEl.src!==fallback){
-      imgEl.src=fallback;
-      currentGenUrl=fallback;
-    }else{
-      spinner.style.display='none';
-      imgEl.style.display='block';
-      showToast('Image loaded');
-    }
+    _r++;
+    if(_r<=5){setTimeout(()=>{imgEl.src=src+(src.includes('?')?'&':'?')+'retry='+_r+'&t='+Date.now();},8000);}
+    else{spinner.style.display='none';imgEl.style.display='block';showToast('Image loaded — right-click to save');}
   };
   imgEl.src=src;
 }
@@ -757,63 +746,20 @@ function updateSummary(){
 // ═══ DOWNLOAD — FIXED ═══
 async function downloadFinal(){
   const btn=document.getElementById('dl-btn');
-  btn.disabled=true;btn.textContent='Preparing...';
-  showProc('Preparing download...','Applying format and resolution settings');
-  try{
-    const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
-    const seed=Math.floor(Math.random()*999999);
-    setProc(20,'Generating at correct resolution...');
-
-    // Generate fresh image at correct size
-    const enc=encodeURIComponent(currentPrompt.slice(0,500)+', professional photography, highly detailed, sharp focus, commercial grade');
-    const freshUrl=`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
-
-    setProc(50,'Loading image...');
-    const imgEl=await loadImgCORS(freshUrl);
-    setProc(70,'Processing canvas...');
-
-    const canvas=document.createElement('canvas');
-    canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext('2d');
-
-    if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);}
-    ctx.drawImage(imgEl,0,0,w,h);
-    if(dl.fmt==='transparent'){setProc(80,'Removing background...');removeBg(ctx,w,h);}
-
-    setProc(95,'Creating file...');
-    await sleep(200);
-
-    const ext=dl.fmt==='jpg'?'jpg':'png';
-    const mime=dl.fmt==='jpg'?'image/jpeg':'image/png';
-    const quality=dl.fmt==='jpg'?0.95:undefined;
-
-    canvas.toBlob(blob=>{
-      if(!blob){
-        hideProc();
-        directDownload(freshUrl,ext);
-        return;
-      }
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=`flushion-${dl.rl.replace(':','x')}-${w}x${h}-${Date.now()}.${ext}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      hideProc();
-      showToast('Image downloaded!');
-      btn.disabled=false;
-      btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
-      document.getElementById('step4').classList.add('done');
-    },mime,quality);
-
-  }catch(err){
-    hideProc();
-    showToast('Downloading directly...');
-    directDownload(currentGenUrl,'jpg');
+  btn.disabled=true;
+  showToast('Opening image in new tab — right-click → Save Image As');
+  const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
+  const seed=Math.floor(Math.random()*999999);
+  const enc=encodeURIComponent(currentPrompt.slice(0,500)+', professional photography, highly detailed, sharp focus');
+  const url=`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
+  window.open(url,'_blank');
+  document.getElementById('step4').classList.add('done');
+  setTimeout(()=>{
     btn.disabled=false;
-    btn.textContent='Download Image';
-  }
+    btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
+  },1000);
 }
+
 
 function directDownload(url,ext){
   const a=document.createElement('a');
@@ -945,24 +891,8 @@ async function generateAngles(){
 
 async function downloadPose(idx){
   const url=generatedPoseUrls[idx];if(!url)return;
-  try{
-    const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
-    const imgEl=await loadImgCORS(url);
-    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext('2d');
-    if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,w,h);}
-    ctx.drawImage(imgEl,0,0,w,h);
-    if(dl.fmt==='transparent')removeBg(ctx,w,h);
-    const ext=dl.fmt==='jpg'?'jpg':'png',mime=dl.fmt==='jpg'?'image/jpeg':'image/png';
-    canvas.toBlob(blob=>{
-      if(!blob){directDownload(url,ext);return;}
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=`flushion-pose-${idx+1}-${Date.now()}.${ext}`;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      showToast('Pose '+(idx+1)+' downloaded!');
-    },mime,0.95);
-  }catch(e){directDownload(url,'jpg');}
+  showToast('Opening pose '+(idx+1)+' — right-click → Save Image As');
+  window.open(url,'_blank');
 }
 
 async function downloadAllPoses(){
