@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -717,12 +717,16 @@ function showGenResult(src){
   spinner.style.display='block';
   imgEl.style.display='none';
 
-  let _r=0;
-  imgEl.onload=()=>{spinner.style.display='none';imgEl.style.display='block';showToast('Image ready!');};
+  imgEl.onload=()=>{
+    spinner.style.display='none';
+    imgEl.style.display='block';
+    showToast('Image ready!');
+  };
   imgEl.onerror=()=>{
-    _r++;
-    if(_r<=5){setTimeout(()=>{imgEl.src=src+(src.includes('?')?'&':'?')+'retry='+_r+'&t='+Date.now();},8000);}
-    else{spinner.style.display='none';imgEl.style.display='block';showToast('Image loaded — right-click to save');}
+    // Pollinations busy — retry same URL after 10s
+    setTimeout(()=>{
+      imgEl.src=src+'&t='+Date.now();
+    },10000);
   };
   imgEl.src=src;
 }
@@ -747,12 +751,13 @@ function updateSummary(){
 async function downloadFinal(){
   const btn=document.getElementById('dl-btn');
   btn.disabled=true;
-  showToast('Opening image in new tab — right-click → Save Image As');
-  const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
-  const seed=Math.floor(Math.random()*999999);
-  const enc=encodeURIComponent(currentPrompt.slice(0,500)+', professional photography, highly detailed, sharp focus');
-  const url=`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
-  window.open(url,'_blank');
+  // Open the SAME image that was shown in preview
+  if(currentGenUrl){
+    showToast('Image opening — right-click → Save Image As');
+    window.open(currentGenUrl,'_blank');
+  } else {
+    showToast('No image generated yet');
+  }
   document.getElementById('step4').classList.add('done');
   setTimeout(()=>{
     btn.disabled=false;
@@ -891,7 +896,7 @@ async function generateAngles(){
 
 async function downloadPose(idx){
   const url=generatedPoseUrls[idx];if(!url)return;
-  showToast('Opening pose '+(idx+1)+' — right-click → Save Image As');
+  showToast('Pose '+(idx+1)+' opening — right-click → Save Image As');
   window.open(url,'_blank');
 }
 
@@ -919,7 +924,21 @@ function removeBg(ctx,w,h){
   for(let i=0;i<d.length;i+=4){if(Math.abs(d[i]-br)<tol&&Math.abs(d[i+1]-bg)<tol&&Math.abs(d[i+2]-bb)<tol)d[i+3]=0;}
   ctx.putImageData(id,0,0);
 }
-function toBase64(file){return new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.onerror=j;rd.readAsDataURL(file);});}
+function toBase64(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      let w=img.width,h=img.height,max=1024;
+      if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',0.85).split(',')[1]);
+    };
+    img.onerror=reject;
+    img.src=URL.createObjectURL(file);
+  });
+}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function setProgress(id,pct){const el=document.getElementById(id);if(el)el.style.width=pct+'%';}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
