@@ -5,37 +5,30 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const { imageBase64, mimeType, userDesc } = req.body || {};
+  if (!imageBase64) return res.status(400).json({ error: 'Image required' });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY not set in Vercel environment variables' });
+
   try {
-    const { imageBase64, mimeType, userDesc } = req.body;
-    if (!imageBase64) return res.status(400).json({ error: 'Image required' });
+    const prompt = `You are a professional product photographer and AI image analyst. Analyze this product image carefully.
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
-
-    const prompt = `You are an expert product photography AI for Flushion Universal Studio. Analyze this product image carefully.
-
-Respond in EXACTLY this JSON format (no markdown, no explanation, pure JSON only):
+Respond ONLY with a valid JSON object — no markdown, no extra text. Format:
 {
-  "category": "one of: saree, western_fashion, jewelry, electronics, food, furniture, footwear, bag, beauty",
-  "sub_type": "specific sub-type (e.g. Banarasi Silk, Kanjeevaram, Patola, T-Shirt, Gold Jewelry, Smartphone etc)",
-  "title": "short descriptive title in Hindi or English",
-  "description": "2-3 sentences describing the product, its material, style, and commercial potential",
-  "fidelity_rules": [
-    "specific rule 1 about what must be preserved in AI generation",
-    "specific rule 2",
-    "specific rule 3",
-    "specific rule 4"
-  ],
-  "generation_prompt": "Detailed English prompt for AI image generation describing this exact product — include material, color, pattern, texture, style, quality descriptors",
-  "scene": "recommended scene/background for this product type",
-  "negative_prompt": "what to avoid in generation for this product type"
+  "category": "saree|western_fashion|jewelry|electronics|food|furniture|footwear|bag|beauty",
+  "sub_type": "specific type e.g. Banarasi Silk Saree / Denim Jacket / Gold Necklace",
+  "title": "Short product title",
+  "description": "2-3 sentence professional description of the product, colors, patterns, material",
+  "fidelity_rules": ["rule1", "rule2", "rule3", "rule4", "rule5"],
+  "generation_prompt": "Professional [category] product photography, [key details], high quality, detailed, sharp focus"
 }
 
-${userDesc ? 'Additional user info: ' + userDesc : ''}
+User hint: ${userDesc || 'none'}
 
-Be very specific and accurate. For sarees, identify the exact type (Banarasi/Kanjeevaram/Patola/Chanderi/Bandhani/Cotton). For fashion, identify garment type and style. For jewelry, identify metal and style.`;
+For fidelity_rules, list the most important things the AI must preserve when generating images of this product.`;
 
-    const geminiRes = await fetch(
+    const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
@@ -43,42 +36,33 @@ Be very specific and accurate. For sarees, identify the exact type (Banarasi/Kan
         body: JSON.stringify({
           contents: [{
             parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType || 'image/jpeg',
-                  data: imageBase64
-                }
-              },
-              { text: prompt }
+              { text: prompt },
+              { inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } }
             ]
           }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 1024
-          }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
         })
       }
     );
 
-    const geminiData = await geminiRes.json();
-
-    if (geminiData.error) {
-      return res.status(500).json({ error: geminiData.error.message });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Gemini API error ${response.status}: ${err.substring(0, 200)}`);
     }
 
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const clean = rawText.replace(/```json|```/g, '').trim();
+    const result = await response.json();
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    let parsed;
-    try {
-      parsed = JSON.parse(clean);
-    } catch (e) {
-      return res.status(500).json({ error: 'Parse error', raw: rawText });
-    }
+    // Parse JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in Gemini response');
 
-    return res.status(200).json({ success: true, data: parsed });
+    const data = JSON.parse(jsonMatch[0]);
+
+    return res.status(200).json({ success: true, data });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('Analyze error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 }
