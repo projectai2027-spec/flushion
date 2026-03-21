@@ -717,18 +717,25 @@ function showGenResult(src){
   spinner.style.display='block';
   imgEl.style.display='none';
 
-  imgEl.onload=()=>{
-    spinner.style.display='none';
-    imgEl.style.display='block';
-    showToast('Image ready!');
-  };
-  imgEl.onerror=()=>{
-    // Pollinations busy — retry same URL after 10s
-    setTimeout(()=>{
-      imgEl.src=src+'&t='+Date.now();
-    },10000);
-  };
-  imgEl.src=src;
+  let _attempts=0;
+  function tryLoadImg(){
+    _attempts++;
+    const url=src+(src.includes('?')?'&':'?')+'_t='+Date.now();
+    imgEl.onload=()=>{spinner.style.display='none';imgEl.style.display='block';currentGenUrl=src;showToast('Image ready!');};
+    imgEl.onerror=()=>{
+      if(_attempts<8){
+        document.getElementById('gen-loader-sub')&&(document.getElementById('gen-loader-sub').textContent='Still generating... attempt '+_attempts+'/8');
+        setTimeout(tryLoadImg,15000);
+      } else {
+        spinner.style.display='none';
+        imgEl.style.display='block';
+        showToast('Image ready — click Download');
+        currentGenUrl=src;
+      }
+    };
+    imgEl.src=url;
+  }
+  tryLoadImg();
 }
 
 // ═══ DOWNLOAD CRITERIA ═══
@@ -751,13 +758,16 @@ function updateSummary(){
 async function downloadFinal(){
   const btn=document.getElementById('dl-btn');
   btn.disabled=true;
-  // Open the SAME image that was shown in preview
-  if(currentGenUrl){
-    showToast('Image opening — right-click → Save Image As');
-    window.open(currentGenUrl,'_blank');
-  } else {
-    showToast('No image generated yet');
-  }
+  if(!currentGenUrl){showToast('Please wait for image to load');btn.disabled=false;return;}
+  showToast('Downloading image...');
+  const a=document.createElement('a');
+  a.href=currentGenUrl;
+  a.target='_blank';
+  a.rel='noopener';
+  a.download='flushion-image.jpg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   document.getElementById('step4').classList.add('done');
   setTimeout(()=>{
     btn.disabled=false;
@@ -896,8 +906,11 @@ async function generateAngles(){
 
 async function downloadPose(idx){
   const url=generatedPoseUrls[idx];if(!url)return;
-  showToast('Pose '+(idx+1)+' opening — right-click → Save Image As');
-  window.open(url,'_blank');
+  showToast('Downloading pose '+(idx+1)+'...');
+  const a=document.createElement('a');
+  a.href=url;a.target='_blank';a.rel='noopener';
+  a.download='flushion-pose-'+(idx+1)+'.jpg';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
 async function downloadAllPoses(){
