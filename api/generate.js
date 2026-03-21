@@ -10,12 +10,7 @@ export default async function handler(req, res) {
 
   const useSeed = seed || Math.floor(Math.random() * 999999);
   const enc = encodeURIComponent(prompt.trim().substring(0, 500));
-
-  // Clean URL — no model=flux, no enhance (these break Pollinations)
   const imageUrl = `https://image.pollinations.ai/prompt/${enc}?width=${width}&height=${height}&seed=${useSeed}&nologo=true`;
 
-  return res.status(200).json({
-    success: true,
-    imageUrl: imageUrl
-  });
+  return res.status(200).json({ success: true, imageUrl });
 }
