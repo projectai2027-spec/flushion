@@ -11,11 +11,11 @@ export default async function handler(req, res) {
   const falKey = process.env.FAL_KEY;
   if (!falKey) return res.status(500).json({ error: 'FAL_KEY missing' });
 
+  // Round to nearest 8
   const w = Math.round(Math.min(parseInt(width)||1024, 2048)/8)*8;
   const h = Math.round(Math.min(parseInt(height)||1024, 2048)/8)*8;
 
   try {
-    // FLUX.1-dev — best quality for complex patterns like Patola ikat
     const falRes = await fetch('https://fal.run/fal-ai/flux/dev', {
       method: 'POST',
       headers: {
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         prompt: prompt.trim().substring(0, 500),
         image_size: { width: w, height: h },
-        num_inference_steps: 50,
+        num_inference_steps: 28,
         guidance_scale: 3.5,
         num_images: 1,
         enable_safety_checker: false,
@@ -34,11 +34,12 @@ export default async function handler(req, res) {
     });
 
     const falData = await falRes.json();
-    if (!falRes.ok) throw new Error(`fal.ai ${falRes.status}: ${JSON.stringify(falData).substring(0,300)}`);
+    if (!falRes.ok) throw new Error(`fal.ai ${falRes.status}: ${JSON.stringify(falData).substring(0,200)}`);
 
     const imageUrl = falData.images?.[0]?.url;
-    if (!imageUrl) throw new Error('No image URL: ' + JSON.stringify(falData).substring(0,200));
+    if (!imageUrl) throw new Error('No image URL');
 
+    // Fetch and return as base64
     const imgRes = await fetch(imageUrl);
     const buffer = await imgRes.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
