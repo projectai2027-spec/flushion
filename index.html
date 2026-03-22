@@ -679,6 +679,8 @@ function startGeneration(){
 
 async function generateImage(prompt,size,rw,rh,callback){
   const w=Math.round(size),h=Math.round(size*(rh/rw));
+  // fal.ai needs dimensions divisible by 8
+  const fw=Math.round(w/8)*8||1024, fh=Math.round(h/8)*8||1024;
   const seed=Math.floor(Math.random()*999999);
   let p=15;
   const iv=setInterval(()=>{p=Math.min(p+3,80);setProgress('gen-progress',p);},2000);
@@ -686,7 +688,7 @@ async function generateImage(prompt,size,rw,rh,callback){
     const res=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt,width:w,height:h,seed})
+      body:JSON.stringify({prompt,width:fw,height:fh,seed})
     });
     const data=await res.json();
     clearInterval(iv);setProgress('gen-progress',100);
@@ -727,14 +729,9 @@ function showGenResult(src){
     spinner.style.display='none';
     imgEl.style.display='block';
     currentGenUrl=src;
-    showToast('Image ready — click Download');
+    showToast('Image ready');
   };
-  // base64 data URL — set directly, no URL tricks
-  if(src.startsWith('data:')){
-    imgEl.src=src;
-  } else {
-    imgEl.src=src;
-  }
+  imgEl.src=src;
 }
 
 // ═══ DOWNLOAD CRITERIA ═══
@@ -758,33 +755,67 @@ async function downloadFinal(){
   const btn=document.getElementById('dl-btn');
   btn.disabled=true;
   if(!currentGenUrl){showToast('Please wait for image');btn.disabled=false;return;}
+  showProc('Preparing download...','Generating at selected quality & ratio');
+  
+  const w=Math.round(dl.q), h=Math.round(dl.q*(dl.rh/dl.rw));
+  const fw=Math.round(w/8)*8, fh=Math.round(h/8)*8;
   
   try {
-    // If base64 - download directly
-    if(currentGenUrl.startsWith('data:')){
-      const a=document.createElement('a');
-      a.href=currentGenUrl;
-      a.download='flushion-image.jpg';
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      showToast('Image downloaded!');
-    } else {
-      // URL - open in new tab
-      const a=document.createElement('a');
-      a.href=currentGenUrl;
-      a.target='_blank';
-      a.download='flushion-image.jpg';
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      showToast('Image opening — right-click to save');
-    }
-  } catch(e) {
-    showToast('Download failed — try right-click on image');
+    setProc(20,'Generating at '+fw+'x'+fh+'...');
+    // Request fresh image at correct size from server
+    const resp = await fetch('/api/generate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:currentPrompt+', ultra detailed, 8K quality, sharp focus, professional photography', width:fw, height:fh})
+    });
+    const data = await resp.json();
+    const imgSrc = data.image || currentGenUrl;
+    
+    setProc(70,'Processing image...');
+    
+    // Draw on canvas with format options
+    const img = new Image();
+    await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=imgSrc;});
+    
+    const canvas = document.createElement('canvas');
+    canvas.width=fw; canvas.height=fh;
+    const ctx = canvas.getContext('2d');
+    
+    if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,fw,fh);}
+    ctx.drawImage(img,0,0,fw,fh);
+    if(dl.fmt==='transparent'){removeBg(ctx,fw,fh);}
+    
+    setProc(90,'Creating file...');
+    const ext = dl.fmt==='jpg'?'jpg':'png';
+    const mime = dl.fmt==='jpg'?'image/jpeg':'image/png';
+    const quality = dl.fmt==='jpg'?0.95:undefined;
+    
+    canvas.toBlob(blob=>{
+      hideProc();
+      if(!blob){
+        // Fallback: direct download
+        const a=document.createElement('a');a.href=imgSrc;a.download='flushion-image.'+ext;
+        document.body.appendChild(a);a.click();document.body.removeChild(a);
+      } else {
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='flushion-'+dl.rl.replace(':','x')+'-'+fw+'x'+fh+'.'+ext;
+        document.body.appendChild(a);a.click();document.body.removeChild(a);
+      }
+      showToast('Downloaded!');
+      btn.disabled=false;
+      btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
+      document.getElementById('step4').classList.add('done');
+    },mime,quality);
+    
+  } catch(err) {
+    hideProc();
+    // Simple fallback
+    const a=document.createElement('a');a.href=currentGenUrl;a.download='flushion-image.jpg';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    showToast('Downloaded!');
+    btn.disabled=false;btn.textContent='Download Image';
   }
-  
-  document.getElementById('step4').classList.add('done');
-  setTimeout(()=>{
-    btn.disabled=false;
-    btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
-  },1000);
 }
 
 
@@ -881,9 +912,14 @@ async function generateAngles(){
     const fullPrompt=currentPrompt+', '+t.prompt+(extra?', '+extra:'')+', professional quality, sharp focus';
     const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
     const seed=Math.floor(Math.random()*999999);
-    const enc=encodeURIComponent(fullPrompt.slice(0,500));
-    const url=`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`;
-    generatedPoseUrls[i]=url;
+    // Call server API for pose generation
+    let poseImgSrc = null;
+    try {
+      const pr = await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:fullPrompt.slice(0,500),width:w,height:h})});
+      const pd = await pr.json();
+      poseImgSrc = pd.image || pd.imageUrl || null;
+    } catch(e){ poseImgSrc = null; }
+    generatedPoseUrls[i]=poseImgSrc;
 
     await new Promise(resolve=>{
       const img=new Image();
@@ -897,7 +933,7 @@ async function generateAngles(){
     const wrap=document.getElementById('pose-wrap-'+i);
     if(wrap){
       const img=document.createElement('img');
-      img.src=url;
+      img.src=poseImgSrc;
       img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
       img.onerror=()=>{img.style.display='none';};
       wrap.innerHTML='';
@@ -917,11 +953,11 @@ async function generateAngles(){
 }
 
 async function downloadPose(idx){
-  const url=generatedPoseUrls[idx];if(!url)return;
+  const src=generatedPoseUrls[idx];if(!src)return;
   const a=document.createElement('a');
-  a.href=url;
+  a.href=src;
   a.download='flushion-pose-'+(idx+1)+'.jpg';
-  if(!url.startsWith('data:'))a.target='_blank';
+  if(!src.startsWith('data:'))a.target='_blank';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   showToast('Pose '+(idx+1)+' downloading!');
 }
