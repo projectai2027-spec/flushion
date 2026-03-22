@@ -11,22 +11,39 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(500).json({ success: false, error: 'GEMINI_API_KEY missing' });
 
-  // Updated models - 2.5 Flash is current free tier model (March 2026)
-  const models = ['gemini-2.5-flash-preview-04-17', 'gemini-2.5-flash', 'gemini-2.5-flash-lite-preview-06-17'];
+  const models = ['gemini-2.5-flash-preview-04-17', 'gemini-2.5-flash', 'gemini-2.0-flash-exp'];
+  
+  const prompt = `You are an expert fashion photographer and textile analyst. Study this product image with extreme detail.
 
-  const prompt = `Analyze this product image. Reply ONLY with valid JSON, no markdown, no extra text:
+Analyze EVERY visual detail you can see:
+- Exact fabric type, texture, weave pattern
+- All colors (primary, secondary, border, pallu)
+- Every design motif, pattern, print visible
+- Embroidery/zari/work details
+- Border design and width
+- Pallu design if visible
+- Any embellishments
+
+Then create a HIGHLY DETAILED generation prompt that will reproduce this EXACT product on a new model.
+
+Reply ONLY with valid JSON, no markdown:
 {
   "category": "saree|western_fashion|jewelry|electronics|food|furniture|footwear|bag|beauty",
-  "sub_type": "specific type e.g. Banarasi Silk Saree",
-  "title": "short product title",
-  "description": "2-3 sentence description of product, colors, material",
-  "fidelity_rules": ["rule1","rule2","rule3"],
-  "generation_prompt": "Professional product photography, high quality, sharp focus"
+  "sub_type": "very specific type e.g. Banarasi Silk Saree with gold zari work",
+  "title": "product title",
+  "description": "detailed 3-4 sentence description of exact colors, fabric, patterns, work",
+  "fidelity_rules": [
+    "exact color: [list exact colors seen]",
+    "fabric: [exact fabric type]", 
+    "pattern: [exact pattern description]",
+    "work: [exact embroidery/zari details]",
+    "border: [exact border description]"
+  ],
+  "generation_prompt": "EXTREMELY DETAILED prompt — describe fabric, colors, patterns, work in full detail so AI reproduces the EXACT same product. Include: fabric type, exact colors, pattern names, border details, pallu design, all visible motifs"
 }
 User hint: ${userDesc || 'none'}`;
 
   let lastError = '';
-
   for (const model of models) {
     try {
       const geminiRes = await fetch(
@@ -41,30 +58,20 @@ User hint: ${userDesc || 'none'}`;
                 { inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } }
               ]
             }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1500 }
           })
         }
       );
-
       const geminiData = await geminiRes.json();
-
-      if (!geminiRes.ok) {
-        lastError = `${model}: ${geminiData?.error?.message || geminiRes.status}`;
-        continue;
-      }
-
+      if (!geminiRes.ok) { lastError = `${model}: ${geminiData?.error?.message}`; continue; }
       const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { lastError = `${model}: bad response`; continue; }
-
+      if (!jsonMatch) { lastError = `${model}: no JSON`; continue; }
       const data = JSON.parse(jsonMatch[0]);
-      return res.status(200).json({ success: true, data, model_used: model });
-
+      return res.status(200).json({ success: true, data });
     } catch (err) {
       lastError = `${model}: ${err.message}`;
-      continue;
     }
   }
-
   return res.status(500).json({ success: false, error: lastError });
 }
