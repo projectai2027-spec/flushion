@@ -717,25 +717,24 @@ function showGenResult(src){
   spinner.style.display='block';
   imgEl.style.display='none';
 
-  let _attempts=0;
-  function tryLoadImg(){
-    _attempts++;
-    const url=src+(src.includes('?')?'&':'?')+'_t='+Date.now();
-    imgEl.onload=()=>{spinner.style.display='none';imgEl.style.display='block';currentGenUrl=src;showToast('Image ready!');};
-    imgEl.onerror=()=>{
-      if(_attempts<8){
-        document.getElementById('gen-loader-sub')&&(document.getElementById('gen-loader-sub').textContent='Still generating... attempt '+_attempts+'/8');
-        setTimeout(tryLoadImg,15000);
-      } else {
-        spinner.style.display='none';
-        imgEl.style.display='block';
-        showToast('Image ready — click Download');
-        currentGenUrl=src;
-      }
-    };
-    imgEl.src=url;
+  imgEl.onload=()=>{
+    spinner.style.display='none';
+    imgEl.style.display='block';
+    currentGenUrl=src;
+    showToast('Image ready!');
+  };
+  imgEl.onerror=()=>{
+    spinner.style.display='none';
+    imgEl.style.display='block';
+    currentGenUrl=src;
+    showToast('Image ready — click Download');
+  };
+  // base64 data URL — set directly, no URL tricks
+  if(src.startsWith('data:')){
+    imgEl.src=src;
+  } else {
+    imgEl.src=src;
   }
-  tryLoadImg();
 }
 
 // ═══ DOWNLOAD CRITERIA ═══
@@ -758,16 +757,29 @@ function updateSummary(){
 async function downloadFinal(){
   const btn=document.getElementById('dl-btn');
   btn.disabled=true;
-  if(!currentGenUrl){showToast('Please wait for image to load');btn.disabled=false;return;}
-  showToast('Downloading image...');
-  const a=document.createElement('a');
-  a.href=currentGenUrl;
-  a.target='_blank';
-  a.rel='noopener';
-  a.download='flushion-image.jpg';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if(!currentGenUrl){showToast('Please wait for image');btn.disabled=false;return;}
+  
+  try {
+    // If base64 - download directly
+    if(currentGenUrl.startsWith('data:')){
+      const a=document.createElement('a');
+      a.href=currentGenUrl;
+      a.download='flushion-image.jpg';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      showToast('Image downloaded!');
+    } else {
+      // URL - open in new tab
+      const a=document.createElement('a');
+      a.href=currentGenUrl;
+      a.target='_blank';
+      a.download='flushion-image.jpg';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      showToast('Image opening — right-click to save');
+    }
+  } catch(e) {
+    showToast('Download failed — try right-click on image');
+  }
+  
   document.getElementById('step4').classList.add('done');
   setTimeout(()=>{
     btn.disabled=false;
@@ -906,11 +918,12 @@ async function generateAngles(){
 
 async function downloadPose(idx){
   const url=generatedPoseUrls[idx];if(!url)return;
-  showToast('Downloading pose '+(idx+1)+'...');
   const a=document.createElement('a');
-  a.href=url;a.target='_blank';a.rel='noopener';
+  a.href=url;
   a.download='flushion-pose-'+(idx+1)+'.jpg';
+  if(!url.startsWith('data:'))a.target='_blank';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast('Pose '+(idx+1)+' downloading!');
 }
 
 async function downloadAllPoses(){
