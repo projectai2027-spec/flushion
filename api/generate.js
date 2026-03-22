@@ -9,11 +9,14 @@ export default async function handler(req, res) {
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   const falKey = process.env.FAL_KEY;
-  if (!falKey) return res.status(500).json({ error: 'FAL_KEY missing in Vercel env vars' });
+  if (!falKey) return res.status(500).json({ error: 'FAL_KEY missing' });
+
+  // fal.ai supports max 2048x2048
+  const w = Math.min(parseInt(width) || 1024, 2048);
+  const h = Math.min(parseInt(height) || 1024, 2048);
 
   try {
-    // Direct sync call - no queue
-    const falRes = await fetch('https://fal.run/fal-ai/flux/schnell', {
+    const falRes = await fetch('https://fal.run/fal-ai/flux/dev', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${falKey}`,
@@ -21,8 +24,9 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         prompt: prompt.trim().substring(0, 500),
-        image_size: { width: Math.min(width, 1024), height: Math.min(height, 1024) },
-        num_inference_steps: 4,
+        image_size: { width: w, height: h },
+        num_inference_steps: 28,
+        guidance_scale: 3.5,
         num_images: 1,
         enable_safety_checker: false,
         output_format: 'jpeg'
@@ -30,13 +34,10 @@ export default async function handler(req, res) {
     });
 
     const falData = await falRes.json();
-
-    if (!falRes.ok) {
-      throw new Error(`fal.ai ${falRes.status}: ${JSON.stringify(falData).substring(0, 300)}`);
-    }
+    if (!falRes.ok) throw new Error(`fal.ai ${falRes.status}: ${JSON.stringify(falData).substring(0,300)}`);
 
     const imageUrl = falData.images?.[0]?.url;
-    if (!imageUrl) throw new Error('No image URL: ' + JSON.stringify(falData).substring(0, 200));
+    if (!imageUrl) throw new Error('No image URL: ' + JSON.stringify(falData).substring(0,200));
 
     // Fetch image → base64
     const imgRes = await fetch(imageUrl);
