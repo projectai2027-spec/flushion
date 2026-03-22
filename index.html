@@ -674,30 +674,38 @@ function startGeneration(){
   selectedAngles=[];generatedPoseUrls=[];
   document.getElementById('batch-progress').classList.remove('show');
   document.getElementById('poses-result').style.display='none';
-  generateImage(currentPrompt,dl.q,dl.rw,dl.rh,showGenResult);
+  generateImage(currentPrompt,dl.q,dl.rw,dl.rh,showGenResult,uploadedFiles[0]);
 }
 
-async function generateImage(prompt,size,rw,rh,callback){
+async function generateImage(prompt,size,rw,rh,callback,refFile){
   const w=Math.round(size),h=Math.round(size*(rh/rw));
+  const fw=Math.round(w/8)*8||1024, fh=Math.round(h/8)*8||1024;
   const seed=Math.floor(Math.random()*999999);
   let p=15;
   const iv=setInterval(()=>{p=Math.min(p+3,80);setProgress('gen-progress',p);},2000);
   try{
+    // Build request body — include reference image for img2img
+    const body={prompt,width:fw,height:fh,seed};
+    if(refFile){
+      try{
+        body.refImage=await toBase64(refFile);
+        body.refMime=refFile.type||'image/jpeg';
+      }catch(e){console.log('ref image error',e);}
+    }
     const res=await fetch('/api/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt,width:w,height:h,seed})
+      body:JSON.stringify(body)
     });
     const data=await res.json();
     clearInterval(iv);setProgress('gen-progress',100);
     if(data.image){callback(data.image);}
     else if(data.imageUrl){callback(data.imageUrl);}
-    else throw new Error('No image URL');
+    else throw new Error(data.error||'No image');
   }catch(err){
     clearInterval(iv);
-    // Direct fallback
-    const enc=encodeURIComponent(prompt.slice(0,500)+', professional photography, highly detailed, sharp focus');
-    callback(`https://image.pollinations.ai/prompt/${enc}?width=${w}&height=${h}&nologo=true&seed=${seed}`);
+    showToast('Generation failed: '+err.message);
+    setProgress('gen-progress',100);
   }
 }
 
@@ -753,52 +761,34 @@ async function downloadFinal(){
   btn.disabled=true;
   if(!currentGenUrl){showToast('Please wait for image');btn.disabled=false;return;}
   showProc('Preparing download...','Processing at selected quality & ratio');
-
   const targetW=Math.round(dl.q);
   const targetH=Math.round(dl.q*(dl.rh/dl.rw));
-
   try{
     setProc(30,'Loading image...');
     const img=new Image();
-    await new Promise((res,rej)=>{
-      img.onload=res; img.onerror=rej; img.src=currentGenUrl;
-    });
-
-    setProc(60,'Applying crop & ratio...');
+    await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=currentGenUrl;});
+    setProc(60,'Applying ratio...');
     const canvas=document.createElement('canvas');
-    canvas.width=targetW; canvas.height=targetH;
+    canvas.width=targetW;canvas.height=targetH;
     const ctx=canvas.getContext('2d');
-
-    // PROPER CROP — not stretch
-    // Calculate source crop to match target ratio
-    const targetRatio=targetW/targetH;
-    const srcRatio=img.width/img.height;
+    // CROP to ratio — not stretch
+    const tr=targetW/targetH, sr=img.width/img.height;
     let sx=0,sy=0,sw=img.width,sh=img.height;
-    if(srcRatio>targetRatio){
-      // Source wider — crop sides
-      sw=Math.round(img.height*targetRatio);
-      sx=Math.round((img.width-sw)/2);
-    } else {
-      // Source taller — crop top/bottom
-      sh=Math.round(img.width/targetRatio);
-      sy=Math.round((img.height-sh)/2);
-    }
-
+    if(sr>tr){sw=Math.round(img.height*tr);sx=Math.round((img.width-sw)/2);}
+    else{sh=Math.round(img.width/tr);sy=Math.round((img.height-sh)/2);}
     if(dl.fmt==='white'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,targetW,targetH);}
     ctx.drawImage(img,sx,sy,sw,sh,0,0,targetW,targetH);
     if(dl.fmt==='transparent'){removeBg(ctx,targetW,targetH);}
-
     setProc(90,'Creating file...');
     const ext=dl.fmt==='jpg'?'jpg':'png';
     const mime=dl.fmt==='jpg'?'image/jpeg':'image/png';
     const quality=dl.fmt==='jpg'?0.95:undefined;
-
     canvas.toBlob(blob=>{
       hideProc();
       if(!blob){
         const a=document.createElement('a');a.href=currentGenUrl;a.download='flushion.'+ext;
         document.body.appendChild(a);a.click();document.body.removeChild(a);
-      } else {
+      }else{
         const a=document.createElement('a');
         a.href=URL.createObjectURL(blob);
         a.download='flushion-'+dl.rl.replace(':','x')+'-'+targetW+'x'+targetH+'.'+ext;
@@ -809,8 +799,7 @@ async function downloadFinal(){
       btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image';
       document.getElementById('step4').classList.add('done');
     },mime,quality);
-
-  } catch(err){
+  }catch(err){
     hideProc();
     const a=document.createElement('a');a.href=currentGenUrl;a.download='flushion.jpg';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
@@ -913,30 +902,27 @@ async function generateAngles(){
     const fullPrompt=currentPrompt+', '+t.prompt+(extra?', '+extra:'')+', professional quality, sharp focus';
     const w=Math.round(dl.q),h=Math.round(dl.q*(dl.rh/dl.rw));
     const seed=Math.floor(Math.random()*999999);
-    // Call server API for pose — uses same quality as main image
-    let poseImgSrc = null;
-    try {
-      const pr = await fetch('/api/generate',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({prompt:fullPrompt.slice(0,500), width:w, height:h})
-      });
-      const pd = await pr.json();
-      poseImgSrc = pd.image || pd.imageUrl || null;
-    } catch(e){ poseImgSrc = null; }
-    generatedPoseUrls[i] = poseImgSrc;
+    // Generate pose via fal.ai API with reference image
+    let poseImgSrc=null;
+    try{
+      const pb={prompt:fullPrompt.slice(0,500),width:w,height:h};
+      if(uploadedFiles[0]){try{pb.refImage=await toBase64(uploadedFiles[0]);pb.refMime=uploadedFiles[0].type||'image/jpeg';}catch(e){}}
+      const pr=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pb)});
+      const pd=await pr.json();
+      poseImgSrc=pd.image||pd.imageUrl||null;
+    }catch(e){poseImgSrc=null;}
+    generatedPoseUrls[i]=poseImgSrc;
 
-    // Update pose card with image
-    const wrap=document.getElementById('pose-wrap-'+i);
-    if(wrap && poseImgSrc){
-      const img=document.createElement('img');
-      img.src=poseImgSrc;
-      img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
-      img.onerror=()=>{img.style.display='none';};
-      wrap.innerHTML='';
-      wrap.appendChild(img);
+    // Update pose card
+    const wrap2=document.getElementById('pose-wrap-'+i);
+    if(wrap2&&poseImgSrc){
+      const pimg=document.createElement('img');
+      pimg.src=poseImgSrc;
+      pimg.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+      pimg.onerror=()=>{pimg.style.display='none';};
+      wrap2.innerHTML='';
+      wrap2.appendChild(pimg);
     }
-
     const dlBtn=document.getElementById('pose-dl-'+i);
     if(dlBtn)dlBtn.disabled=false;
 
@@ -952,8 +938,7 @@ async function generateAngles(){
 async function downloadPose(idx){
   const src=generatedPoseUrls[idx];if(!src)return;
   const a=document.createElement('a');
-  a.href=src;
-  a.download='flushion-pose-'+(idx+1)+'.jpg';
+  a.href=src;a.download='flushion-pose-'+(idx+1)+'.jpg';
   if(!src.startsWith('data:'))a.target='_blank';
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   showToast('Pose '+(idx+1)+' downloading!');
